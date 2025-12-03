@@ -1,0 +1,20 @@
+.memory-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(4, 1fr);
+}
+
+.memory-card {
+    align-items: center;
+    border: 2px solid #00ff3c;
+    border-radius: 0.5rem;
+    display: flex;
+    font-size: 1.4rem;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.memory-card:hover {
+    background: #004501;
+    transform: scale(1.05);
+}
