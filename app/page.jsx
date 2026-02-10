@@ -1,5 +1,3 @@
-"use client";
-
 import MemoryGrid from "./components/MemoryGrid";
 import Score from "./components/Score";
 

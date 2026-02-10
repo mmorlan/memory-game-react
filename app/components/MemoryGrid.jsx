@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import "./MemoryGrid.css";
 import { AlarmClock, Bell, Book, Clock, Globe, Heart, Moon, Music } from "lucide-react";
 import useMemoryGame from "../hooks/useMemoryGame";
@@ -23,7 +24,13 @@ function formatTime(ms) {
 }
 
 export default function MemoryGrid() {
+  const [mounted, setMounted] = useState(false);
   const { board, handleCardClick, resetGame, elapsed } = useMemoryGame();
+
+  useEffect(() => { setMounted(true); }, []);
+
+  if (!mounted) return null;
+
   if (board.every(card => card.matched)) {
     return (
       <>
