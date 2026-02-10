@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import useLocalStorage from "./useLocalStorage";
+import useStopwatch from "./useStopwatch";
 
 const ICON_NAMES = [
   "AlarmClock", "Bell", "Book", "Clock",
@@ -21,6 +23,17 @@ function createShuffledBoard() {
 
 export default function useMemoryGame() {
   const [board, setBoard] = useLocalStorage("memory-game-board", createShuffledBoard());
+  const [startTime, setStartTime] = useLocalStorage("memory-game-start", Date.now());
+  const [endTime, setEndTime] = useLocalStorage("memory-game-end", null);
+
+  const allMatched = board.every(c => c.matched);
+  const elapsed = useStopwatch(!allMatched, startTime, endTime);
+
+  useEffect(() => {
+    if (allMatched && !endTime) {
+      setEndTime(Date.now());
+    }
+  }, [allMatched, endTime, setEndTime]);
 
   function handleCardClick(cardId) {
     const currentlyClicked = board.filter(c => c.clicked && !c.matched);
@@ -54,7 +67,9 @@ export default function useMemoryGame() {
 
   function resetGame() {
     setBoard(createShuffledBoard());
+    setStartTime(Date.now());
+    setEndTime(null);
   }
 
-  return { board, handleCardClick, resetGame };
+  return { board, handleCardClick, resetGame, elapsed };
 }
