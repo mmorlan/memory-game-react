@@ -1,3 +1,5 @@
+"use client";
+
 import "./MemoryGrid.css";
 import { AlarmClock, Bell, Book, Clock, Globe, Heart, Moon, Music } from "lucide-react";
 import useMemoryGame from "../hooks/useMemoryGame";
