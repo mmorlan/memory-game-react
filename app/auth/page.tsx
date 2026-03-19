@@ -4,8 +4,8 @@ import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { signUp, signIn, confirmSignUp } from 'aws-amplify/auth';
-import { isValidEmail } from '../../util/validation';
-import useAuth from '../../hooks/useAuth';
+import { isValidEmail } from '../util/validation';
+import useAuth from '../hooks/useAuth';
 import classes from './page.module.css';
 
 export default function AuthPage() {

@@ -18,7 +18,7 @@ export default function Header() {
             <span>{user.signInDetails?.loginId ?? user.username}</span>
           </button>
         ) : (
-          <Link href="/components/auth" className="header-btn">
+          <Link href="/auth" className="header-btn">
             <User size={16} />
             <span>Profile</span>
           </Link>
