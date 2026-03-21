@@ -2,7 +2,7 @@
 
 import useAuth from "../hooks/useAuth";
 import Link from "next/link";
-import { User, Trophy } from "lucide-react";
+import { User, Trophy, LogOut } from "lucide-react";
 import "./Header.css";
 
 export default function Header() {
@@ -13,18 +13,29 @@ export default function Header() {
       <div className="header-logo">Memory Game</div>
       <nav className="header-nav">
         {user ? (
-          <button className="header-btn" onClick={handleSignOut}>
-            <User size={16} />
-            <span>{user.signInDetails?.loginId ?? user.username}</span>
-          </button>
+          <>
+            <Link href="/profile" className="header-btn">
+              <User size={16} />
+              <span>{user.signInDetails?.loginId ?? user.username}</span>
+            </Link>
+            <button className="header-btn header-btn-signout" onClick={handleSignOut}>
+              <LogOut size={16} />
+              <span>Sign Out</span>
+            </button>
+          </>
         ) : (
-          <Link href="/auth" className="header-btn">
-            <User size={16} />
-            <span>Profile</span>
-          </Link>
+          <>
+            <Link href="/sign-in" className="header-btn">
+              <User size={16} />
+              <span>Sign In</span>
+            </Link>
+            <Link href="/register" className="header-btn header-btn-primary">
+              <span>Register</span>
+            </Link>
+          </>
         )}
         <button className="header-btn">
-          <Trophy size={16} color="#00ff3c" />
+          <Trophy size={16} color="#84cc16" />
           <span>Leaderboard</span>
         </button>
       </nav>

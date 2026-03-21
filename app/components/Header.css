@@ -9,7 +9,7 @@
 }
 
 .header-logo {
-  color: #ffffff;
+  color: #fff;
   font-size: 1.125rem;
   font-weight: 700;
 }
@@ -36,4 +36,23 @@
 
 .header-btn:hover {
   background: #374151;
+}
+
+.header-btn-primary {
+  background: #84cc16;
+  color: #111827;
+  font-weight: 700;
+}
+
+.header-btn-primary:hover {
+  background: #a3e635;
+}
+
+.header-btn-signout {
+  color: #f87171;
+}
+
+.header-btn-signout:hover {
+  background: #2d1f1f;
+  color: #fca5a5;
 }

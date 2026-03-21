@@ -29,14 +29,26 @@ export async function getUser(userId: string) {
 
 export async function updateUser(userId: string, fields: { username?: string; bio?: string }) {
   const client = await getDocumentClient();
+  const parts: string[] = [];
+  const names: Record<string, string> = {};
+  const values: Record<string, string> = {};
+
+  if (fields.username !== undefined) {
+    parts.push("#username = :username");
+    names["#username"] = "username";
+    values[":username"] = fields.username;
+  }
+  if (fields.bio !== undefined) {
+    parts.push("bio = :bio");
+    values[":bio"] = fields.bio;
+  }
+  if (parts.length === 0) return;
+
   await client.send(new UpdateCommand({
     TableName: "memory_users",
     Key: { userID: userId },
-    UpdateExpression: "SET #username = :username, bio = :bio",
-    ExpressionAttributeNames: { "#username": "username" },
-    ExpressionAttributeValues: {
-      ":username": fields.username,
-      ":bio": fields.bio ?? "",
-    },
+    UpdateExpression: `SET ${parts.join(", ")}`,
+    ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
+    ExpressionAttributeValues: values,
   }));
 }
