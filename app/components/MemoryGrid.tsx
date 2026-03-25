@@ -8,13 +8,9 @@ import { ICON_MAP } from "./icons";
 import useMemoryGame from "../hooks/useMemoryGame";
 import useSurvivalGame from "../hooks/useSurvivalGame";
 import { Card } from "../hooks/useMemoryGame";
-
-function formatTime(ms: number): string {
-  const totalSeconds = Math.floor(Math.max(0, ms) / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
+import useAuth from "../hooks/useAuth";
+import { saveGame } from "../util/dynamodb";
+import { formatTime } from "../util/scoring";
 
 const GRID_OPTIONS = Array.from({ length: 9 }, (_, i) => i + 4);
 
@@ -115,17 +111,44 @@ function Lives({ count, max = 3 }: { count: number; max?: number }) {
 }
 
 function FreeplayBoard() {
-  const { board, rows, cols, started, handleCardClick, startGame, resetGame, elapsed } = useMemoryGame();
+  const { user } = useAuth();
+  const { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed } = useMemoryGame();
   const [pendingRows, setPendingRows] = useState(rows);
   const [pendingCols, setPendingCols] = useState(cols);
+  const savedRef = useRef(false);
 
   useEffect(() => {
     setPendingRows(rows);
     setPendingCols(cols);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const allMatched = board.filter((c) => c.iconName !== "__blank__").every((c) => c.matched);
+  // Reset save guard when a new game starts
+  useEffect(() => {
+    if (started) savedRef.current = false;
+  }, [started]);
+
+  // Save completed game to DynamoDB
+  useEffect(() => {
+    if (!allMatched || !started || !user || savedRef.current) return;
+    savedRef.current = true;
+    const pairs = Math.floor((rows * cols) / 2);
+    const now = new Date().toISOString();
+    saveGame(user.userId, {
+      gameId: now,
+      mode: "freeplay",
+      score,
+      timeMs: elapsed,
+      rows,
+      cols,
+      pairs,
+      completedAt: now,
+      leaderboardKey: "freeplay",
+    }).catch(console.error);
+  }, [allMatched, started, user, rows, cols, score, elapsed]);
+
   const showStartGame = !started || pendingRows !== rows || pendingCols !== cols;
+  const matchedCount = board.filter((c) => c.matched && c.iconName !== "__blank__").length / 2;
+  const totalPairs = board.filter((c) => c.iconName !== "__blank__").length / 2;
 
   function handleNewGame() {
     resetGame();
@@ -137,6 +160,7 @@ function FreeplayBoard() {
     return (
       <>
         <div className="win-message">You won in {formatTime(elapsed)}!</div>
+        <div className="win-score">Score: {score.toLocaleString()}</div>
         <button onClick={handleNewGame}>Play Again</button>
       </>
     );
@@ -185,18 +209,12 @@ function FreeplayBoard() {
 
       <div className="stats-bar">
         <div className="stat">
-          <div className="stat-label">Moves</div>
-          <div className="stat-value">0</div>
-        </div>
-        <div className="stat">
           <div className="stat-label">Matches</div>
-          <div className="stat-value">
-            0 / {board.filter((c) => c.iconName !== "__blank__").length / 2}
-          </div>
+          <div className="stat-value">{matchedCount} / {totalPairs}</div>
         </div>
         <div className="stat">
           <div className="stat-label">Current Score</div>
-          <div className="stat-value stat-value-accent">0</div>
+          <div className="stat-value stat-value-accent">{score.toLocaleString()}</div>
         </div>
       </div>
     </>
@@ -204,18 +222,50 @@ function FreeplayBoard() {
 }
 
 function SurvivalBoard() {
+  const { user } = useAuth();
   const {
     board, rows, cols,
-    stage, lives, completions,
+    stage, lives, completions, score,
     started, gameOver, timeLeft,
     handleCardClick, startGame, resetGame,
   } = useSurvivalGame();
+
+  const startedAtRef = useRef<number>(0);
+  const savedRef = useRef(false);
+
+  useEffect(() => {
+    if (started) {
+      startedAtRef.current = Date.now();
+      savedRef.current = false;
+    }
+  }, [started]);
+
+  // Save completed survival run to DynamoDB
+  useEffect(() => {
+    if (!gameOver || !user || savedRef.current) return;
+    savedRef.current = true;
+    const pairs = Math.floor((rows * cols) / 2);
+    const now = new Date().toISOString();
+    saveGame(user.userId, {
+      gameId: now,
+      mode: "survival",
+      score,
+      timeMs: Date.now() - startedAtRef.current,
+      rows,
+      cols,
+      pairs,
+      stage,
+      completedAt: now,
+      leaderboardKey: "survival",
+    }).catch(console.error);
+  }, [gameOver, user, rows, cols, score, stage]);
 
   if (gameOver) {
     return (
       <div className="game-over">
         <div className="game-over-title">Game Over</div>
         <div className="game-over-info">You reached Stage {stage}</div>
+        <div className="game-over-info">Final Score: {score.toLocaleString()}</div>
         <button className="btn-start" onClick={resetGame}>Play Again</button>
       </div>
     );
@@ -225,7 +275,6 @@ function SurvivalBoard() {
 
   return (
     <>
-      {/* Stage info */}
       <div className="survival-info">
         <div className="survival-stat">
           <div className="survival-stat-label">Current Stage</div>
@@ -241,7 +290,6 @@ function SurvivalBoard() {
         </div>
       </div>
 
-      {/* Timer */}
       <div className="timer-row">
         <div className={`timer-box${isLow ? " timer-box-danger" : ""}`}>
           <Clock size={18} color={isLow ? "#ef4444" : "#84cc16"} />
@@ -254,11 +302,10 @@ function SurvivalBoard() {
         </div>
         <div className="scoring-box">
           <div className="scoring-label">Scoring Formula</div>
-          <div className="scoring-formula">Base × Time + Early Bonus</div>
+          <div className="scoring-formula">100 pts × Grid × Time × Level Difficulty</div>
         </div>
       </div>
 
-      {/* Start / New Game */}
       <div className="game-buttons">
         {!started && (
           <button className="btn-start" onClick={startGame}>
@@ -280,11 +327,7 @@ function SurvivalBoard() {
       <div className="stats-bar">
         <div className="stat">
           <div className="stat-label">Total Score</div>
-          <div className="stat-value stat-value-accent">0</div>
-        </div>
-        <div className="stat">
-          <div className="stat-label">Current Streak</div>
-          <div className="stat-value stat-value-accent">0</div>
+          <div className="stat-value stat-value-accent">{score.toLocaleString()}</div>
         </div>
       </div>
     </>

@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import useLocalStorage from "./useLocalStorage";
 import useStopwatch from "./useStopwatch";
 import { ICON_NAMES } from "../components/icons";
+import { calcPairScore } from "../util/scoring";
 
 export interface Card {
   id: number;
@@ -49,6 +50,8 @@ export default function useMemoryGame() {
   const [startTime, setStartTime] = useLocalStorage<number>("mg-start", Date.now());
   const [endTime, setEndTime] = useLocalStorage<number | null>("mg-end", null);
   const [started, setStarted] = useState(false);
+  const [score, setScore] = useState(0);
+  const lastPairTimeRef = useRef<number>(Date.now());
 
   const allMatched = board.filter(c => c.iconName !== "__blank__").every(c => c.matched);
   const elapsed = useStopwatch(started && !allMatched, startTime, endTime);
@@ -78,6 +81,11 @@ export default function useMemoryGame() {
         newBoard = newBoard.map(c =>
           c.clicked && !c.matched ? { ...c, clicked: false, matched: true } : c
         );
+        const now = Date.now();
+        const timeToPair = now - lastPairTimeRef.current;
+        lastPairTimeRef.current = now;
+        const totalPairs = Math.floor((rows * cols) / 2);
+        setScore(prev => prev + calcPairScore(totalPairs, timeToPair));
       } else {
         setTimeout(() => {
           setBoard(prev => prev.map(c =>
@@ -97,6 +105,8 @@ export default function useMemoryGame() {
     setStartTime(Date.now());
     setEndTime(null);
     setStarted(true);
+    setScore(0);
+    lastPairTimeRef.current = Date.now();
   }
 
   function resetGame(): void {
@@ -104,7 +114,9 @@ export default function useMemoryGame() {
     setStartTime(Date.now());
     setEndTime(null);
     setStarted(false);
+    setScore(0);
+    lastPairTimeRef.current = Date.now();
   }
 
-  return { board, rows, cols, started, handleCardClick, startGame, resetGame, elapsed };
+  return { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed };
 }

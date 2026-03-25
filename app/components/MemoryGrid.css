@@ -382,3 +382,9 @@
   color: #9ca3af;
   font-size: 1rem;
 }
+
+.win-score {
+  color: #84cc16;
+  font-size: 1.25rem;
+  font-weight: 600;
+}

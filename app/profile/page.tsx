@@ -5,17 +5,18 @@ import { useRouter } from 'next/navigation';
 import { fetchUserAttributes } from 'aws-amplify/auth';
 import { User, Upload } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
-import { getUser, updateUser } from '../util/dynamodb';
+import { getUser, updateUser, getUserGames, GameRecord } from '../util/dynamodb';
+import { formatTime } from '../util/scoring';
 import classes from './page.module.css';
 
-const STATS = [
-  { label: 'Total Games' },
-  { label: 'Best Score' },
-  { label: 'Avg. Time' },
-  { label: 'Win Rate' },
-] as const;
-
 const GAMES_COLUMNS = ['Date', 'Mode', 'Score', 'Time'];
+
+function computeStats(games: GameRecord[]) {
+  if (games.length === 0) return null;
+  const bestScore = Math.max(...games.map((g) => g.score));
+  const avgTimeMs = games.reduce((sum, g) => sum + g.timeMs, 0) / games.length;
+  return { totalGames: games.length, bestScore, avgTimeMs };
+}
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuth();
@@ -27,6 +28,9 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
+
+  const [games, setGames] = useState<GameRecord[]>([]);
+  const [gamesLoading, setGamesLoading] = useState(true);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -42,6 +46,9 @@ export default function ProfilePage() {
     getUser(user.userId).then((record) => {
       setBio((record?.bio as string) ?? '');
     }).catch(() => {});
+    getUserGames(user.userId).then((records) => {
+      setGames(records);
+    }).catch(() => {}).finally(() => setGamesLoading(false));
   }, [user]);
 
   async function handleSave() {
@@ -65,6 +72,8 @@ export default function ProfilePage() {
   if (isLoading || !user) {
     return <div className={classes.loading}>Loading...</div>;
   }
+
+  const stats = computeStats(games);
 
   return (
     <main className={classes.page}>
@@ -119,12 +128,26 @@ export default function ProfilePage() {
 
       {/* Stats */}
       <div className={classes['stats-grid']}>
-        {STATS.map(({ label }) => (
-          <div key={label} className={classes['stat-card']}>
-            <div className={classes['stat-label']}>{label}</div>
-            <div className={classes['stat-value']}>—</div>
+        <div className={classes['stat-card']}>
+          <div className={classes['stat-label']}>Total Games</div>
+          <div className={classes['stat-value']}>{gamesLoading ? '—' : (stats?.totalGames ?? 0)}</div>
+        </div>
+        <div className={classes['stat-card']}>
+          <div className={classes['stat-label']}>Best Score</div>
+          <div className={classes['stat-value']}>
+            {gamesLoading ? '—' : stats ? stats.bestScore.toLocaleString() : '—'}
           </div>
-        ))}
+        </div>
+        <div className={classes['stat-card']}>
+          <div className={classes['stat-label']}>Avg. Time</div>
+          <div className={classes['stat-value']}>
+            {gamesLoading ? '—' : stats ? formatTime(stats.avgTimeMs) : '—'}
+          </div>
+        </div>
+        <div className={classes['stat-card']}>
+          <div className={classes['stat-label']}>Win Rate</div>
+          <div className={classes['stat-value']}>—</div>
+        </div>
       </div>
 
       {/* Recent games */}
@@ -135,10 +158,25 @@ export default function ProfilePage() {
             <span key={col}>{col}</span>
           ))}
         </div>
-        <div className={classes['games-empty']}>
-          No games recorded yet.{' '}
-          <a href="/" className={classes['play-link']}>Play now!</a>
-        </div>
+        {gamesLoading ? (
+          <div className={classes['games-empty']}>Loading...</div>
+        ) : games.length === 0 ? (
+          <div className={classes['games-empty']}>
+            No games recorded yet.{' '}
+            <a href="/" className={classes['play-link']}>Play now!</a>
+          </div>
+        ) : (
+          <div className={classes['games-rows']}>
+            {games.map((g) => (
+              <div key={g.gameId} className={classes['games-row']}>
+                <span>{new Date(g.completedAt).toLocaleDateString()}</span>
+                <span className={classes[`mode-${g.mode}`]}>{g.mode}</span>
+                <span>{g.score.toLocaleString()}</span>
+                <span>{formatTime(g.timeMs)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );

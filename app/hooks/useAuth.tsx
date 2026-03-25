@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = await getCurrentUser();
       const attrs = await fetchUserAttributes();
       setUser(currentUser);
-      setUsername(attrs.preferred_username ?? null);
+      setUsername(attrs.preferred_username ?? currentUser.signInDetails?.loginId ?? currentUser.username);
     } catch {
       setUser(null);
       setUsername(null);

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, createShuffledBoard } from "./useMemoryGame";
 import useCountdown from "./useCountdown";
+import { calcPairScore } from "../util/scoring";
 
 const STAGE_DURATION_MS = 60_000;
 const COMPLETIONS_PER_STAGE = 3;
@@ -9,6 +10,13 @@ const MAX_LIVES = 3;
 function getGridForStage(stage: number) {
   const size = Math.min(stage + 3, 12); // Stage 1→4, Stage 2→5, ..., Stage 9→12 (max)
   return { rows: size, cols: size };
+}
+
+// completions is 0-indexed within a stage (0 = level 1, 1 = level 2, 2 = level 3)
+function getLDM(completions: number): number {
+  if (completions === 1) return 1.5;
+  if (completions === 2) return 2;
+  return 1;
 }
 
 export default function useSurvivalGame() {
@@ -20,6 +28,8 @@ export default function useSurvivalGame() {
   const [timerActive, setTimerActive] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
+  const [score, setScore] = useState(0);
+  const lastPairTimeRef = useRef<number>(Date.now());
 
   const { rows, cols } = getGridForStage(stage);
   const allMatched = board.filter((c) => c.iconName !== "__blank__").every((c) => c.matched);
@@ -57,6 +67,7 @@ export default function useSurvivalGame() {
       }
       setTimerActive(false);
       setTimerKey((k) => k + 1);
+      lastPairTimeRef.current = Date.now();
     }, 800);
     return () => clearTimeout(timeout);
   }, [allMatched, started, gameOver]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -74,12 +85,16 @@ export default function useSurvivalGame() {
       setBoard(createShuffledBoard(r, c));
       setTimerActive(false);
       setTimerKey((k) => k + 1);
+      lastPairTimeRef.current = Date.now();
     }
   }, [timeLeft, started, timerActive, gameOver, allMatched]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleCardClick(cardId: number): void {
     if (!started || gameOver || (timerActive && timeLeft === 0)) return;
-    if (!timerActive) setTimerActive(true);
+    if (!timerActive) {
+      setTimerActive(true);
+      lastPairTimeRef.current = Date.now();
+    }
     const currentlyClicked = board.filter((c) => c.clicked && !c.matched);
     const clickedCard = board.find((c) => c.id === cardId);
     if (!clickedCard || clickedCard.clicked || clickedCard.matched) return;
@@ -93,6 +108,12 @@ export default function useSurvivalGame() {
         newBoard = newBoard.map((c) =>
           c.clicked && !c.matched ? { ...c, clicked: false, matched: true } : c,
         );
+        const now = Date.now();
+        const timeToPair = now - lastPairTimeRef.current;
+        lastPairTimeRef.current = now;
+        const totalPairs = Math.floor((rows * cols) / 2);
+        const ldm = getLDM(completionsRef.current);
+        setScore((prev) => prev + calcPairScore(totalPairs, timeToPair, ldm));
       } else {
         setTimeout(() => {
           setBoard((prev) =>
@@ -114,6 +135,8 @@ export default function useSurvivalGame() {
     setTimerActive(false);
     setGameOver(false);
     setStarted(true);
+    setScore(0);
+    lastPairTimeRef.current = Date.now();
   }
 
   function resetGame(): void {
@@ -125,11 +148,13 @@ export default function useSurvivalGame() {
     setCompletions(0);
     setBoard(createShuffledBoard(4, 4));
     setTimerKey((k) => k + 1);
+    setScore(0);
+    lastPairTimeRef.current = Date.now();
   }
 
   return {
     board, rows, cols,
-    stage, lives, completions,
+    stage, lives, completions, score,
     started, gameOver, timeLeft,
     handleCardClick, startGame, resetGame,
   };

@@ -56,3 +56,18 @@
   background: #2d1f1f;
   color: #fca5a5;
 }
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.header-skeleton {
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  background: #1f2937;
+  border-radius: 0.5rem;
+  height: 2rem;
+}
+
+.header-skeleton-wide { width: 6rem; }
+.header-skeleton-narrow { width: 4.5rem; }

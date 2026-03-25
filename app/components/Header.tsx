@@ -6,17 +6,22 @@ import { User, Trophy, LogOut } from "lucide-react";
 import "./Header.css";
 
 export default function Header() {
-  const { user, username, isLoading, handleSignOut } = useAuth();
+  const { username, isLoading, handleSignOut } = useAuth();
 
   return (
     <header className="header">
       <div className="header-logo">Memory Game</div>
       <nav className="header-nav">
-        {isLoading ? null : user ? (
+        {isLoading ? (
+          <>
+            <div className="header-skeleton header-skeleton-wide" />
+            <div className="header-skeleton header-skeleton-narrow" />
+          </>
+        ) : username ? (
           <>
             <Link href="/profile" className="header-btn">
               <User size={16} />
-              <span>{username ?? user.username}</span>
+              <span>{username}</span>
             </Link>
             <button className="header-btn header-btn-signout" onClick={handleSignOut}>
               <LogOut size={16} />

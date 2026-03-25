@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { fetchAuthSession } from "aws-amplify/auth";
 
 async function getDocumentClient() {
@@ -51,4 +51,39 @@ export async function updateUser(userId: string, fields: { username?: string; bi
     ExpressionAttributeNames: Object.keys(names).length ? names : undefined,
     ExpressionAttributeValues: values,
   }));
+}
+
+export interface GameRecord {
+  userId: string;
+  gameId: string;
+  mode: "freeplay" | "survival";
+  score: number;
+  timeMs: number;
+  rows: number;
+  cols: number;
+  pairs: number;
+  completedAt: string;
+  leaderboardKey: string;
+  stage?: number; // survival only
+}
+
+export async function saveGame(userId: string, game: Omit<GameRecord, "userId">): Promise<void> {
+  const client = await getDocumentClient();
+  await client.send(new PutCommand({
+    TableName: "memory_games",
+    Item: { userId, ...game },
+  }));
+}
+
+export async function getUserGames(userId: string): Promise<GameRecord[]> {
+  const client = await getDocumentClient();
+  const result = await client.send(new QueryCommand({
+    TableName: "memory_games",
+    KeyConditionExpression: "#uid = :uid",
+    ExpressionAttributeNames: { "#uid": "userId" },
+    ExpressionAttributeValues: { ":uid": userId },
+    ScanIndexForward: false, // newest first
+    Limit: 50,
+  }));
+  return (result.Items ?? []) as GameRecord[];
 }
