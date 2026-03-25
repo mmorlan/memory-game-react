@@ -1,12 +1,13 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { getCurrentUser, fetchUserAttributes, signOut } from 'aws-amplify/auth';
 
 type AuthUser = Awaited<ReturnType<typeof getCurrentUser>>;
 
 interface AuthContextValue {
   user: AuthUser | null;
+  username: string | null;
   isLoading: boolean;
   checkAuth: () => Promise<void>;
   handleSignOut: () => Promise<void>;
@@ -16,14 +17,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   async function checkAuth(): Promise<void> {
     try {
       const currentUser = await getCurrentUser();
+      const attrs = await fetchUserAttributes();
       setUser(currentUser);
+      setUsername(attrs.preferred_username ?? null);
     } catch {
       setUser(null);
+      setUsername(null);
     } finally {
       setIsLoading(false);
     }
@@ -32,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function handleSignOut(): Promise<void> {
     await signOut();
     setUser(null);
+    setUsername(null);
   }
 
   useEffect(() => {
@@ -39,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, checkAuth, handleSignOut }}>
+    <AuthContext.Provider value={{ user, username, isLoading, checkAuth, handleSignOut }}>
       {children}
     </AuthContext.Provider>
   );

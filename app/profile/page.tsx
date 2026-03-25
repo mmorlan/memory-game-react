@@ -23,6 +23,7 @@ export default function ProfilePage() {
 
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -50,6 +51,7 @@ export default function ProfilePage() {
     setIsSaving(true);
     try {
       await updateUser(user.userId, { bio });
+      setIsEditing(false);
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 2500);
     } catch (err) {
@@ -81,24 +83,36 @@ export default function ProfilePage() {
           <div className={classes['profile-info']}>
             <div className={classes['username-display']}>{username}</div>
 
-            <label className={classes['bio-label']}>Bio / Summary</label>
-            <textarea
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              className={classes['bio-input']}
-              placeholder="Add a bio about yourself..."
-            />
-
-            {saveStatus === 'error' && <p className={classes.error}>{errorMsg}</p>}
-            {saveStatus === 'success' && <p className={classes.success}>Saved!</p>}
-
-            <button
-              className={classes['save-btn']}
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              {isSaving ? 'Saving...' : 'Save'}
-            </button>
+            {isEditing ? (
+              <>
+                <textarea
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  className={classes['bio-input']}
+                  placeholder="Add a bio about yourself..."
+                  autoFocus
+                />
+                {saveStatus === 'error' && <p className={classes.error}>{errorMsg}</p>}
+                <div className={classes['bio-actions']}>
+                  <button className={classes['save-btn']} onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button className={classes['cancel-link']} onClick={() => setIsEditing(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className={classes['bio-display']}>
+                  {bio || <span className={classes['bio-placeholder']}>No bio yet.</span>}
+                </p>
+                {saveStatus === 'success' && <p className={classes.success}>Saved!</p>}
+                <button className={classes['edit-link']} onClick={() => setIsEditing(true)}>
+                  Edit
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

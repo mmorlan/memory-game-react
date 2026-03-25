@@ -10,7 +10,7 @@ export interface Card {
   matched: boolean;
 }
 
-function createShuffledBoard(rows: number, cols: number): Card[] {
+export function createShuffledBoard(rows: number, cols: number): Card[] {
   const total = rows * cols;
   const pairs = Math.floor(total / 2);
   const hasBlank = total % 2 === 1;
