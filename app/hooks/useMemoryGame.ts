@@ -89,7 +89,7 @@ export default function useMemoryGame() {
         totalPairTimeMsRef.current += timeToPair;
         matchedPairCountRef.current++;
         const totalPairs = Math.floor((rows * cols) / 2);
-        setScore(prev => prev + calcPairScore(totalPairs, timeToPair));
+        setScore(prev => prev + calcPairScore(totalPairs, elapsed));
       } else {
         setTimeout(() => {
           setBoard(prev => prev.map(c =>

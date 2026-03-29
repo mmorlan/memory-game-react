@@ -119,7 +119,8 @@ export default function useSurvivalGame() {
         if (timerActive && timeLeft <= 3_000) setClutchPairs((prev) => prev + 1);
         const totalPairs = Math.floor((rows * cols) / 2);
         const ldm = getLDM(completionsRef.current);
-        setScore((prev) => prev + calcPairScore(totalPairs, timeToPair, ldm));
+        const elapsed = STAGE_DURATION_MS - timeLeft;
+        setScore((prev) => prev + calcPairScore(totalPairs, elapsed, ldm));
       } else {
         setTimeout(() => {
           setBoard((prev) =>

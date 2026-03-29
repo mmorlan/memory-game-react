@@ -1,9 +1,9 @@
 export function getTimeMultiplier(ms: number): number {
-  if (ms < 3_000) return 10;
-  if (ms < 10_000) return 8;
-  if (ms < 20_000) return 5;
-  if (ms < 30_000) return 2;
+  if (ms < 3_000) return 5;
+  if (ms < 10_000) return 3;
+  if (ms < 20_000) return 2;
   if (ms < 35_000) return 1.5;
+  if (ms < 50_000) return 1.2;
   return 1;
 }
 
