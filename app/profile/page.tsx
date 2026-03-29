@@ -9,14 +9,85 @@ import { getUser, updateUser, getUserGames, GameRecord } from '../util/dynamodb'
 import { formatTime } from '../util/scoring';
 import classes from './page.module.css';
 
-const GAMES_COLUMNS = ['Date', 'Mode', 'Score', 'Time'];
+type Tab = 'global' | 'freeplay' | 'survival';
 
-function computeStats(games: GameRecord[]) {
-  if (games.length === 0) return null;
-  const bestScore = Math.max(...games.map((g) => g.score));
-  const avgTimeMs = games.reduce((sum, g) => sum + g.timeMs, 0) / games.length;
-  return { totalGames: games.length, bestScore, avgTimeMs };
+// ---- Stat computations ----
+
+function mostCommon(values: string[]): string {
+  const counts: Record<string, number> = {};
+  values.forEach(v => { counts[v] = (counts[v] ?? 0) + 1; });
+  return Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
 }
+
+function avgTimeToPair(games: GameRecord[]): string {
+  const timed = games.filter(g => g.avgTimeToPairMs != null);
+  if (timed.length === 0) return '—';
+  const avg = timed.reduce((s, g) => s + g.avgTimeToPairMs!, 0) / timed.length;
+  return formatTime(Math.round(avg));
+}
+
+function computeGlobalStats(games: GameRecord[]) {
+  if (games.length === 0) return null;
+  return {
+    totalGames: games.length,
+    totalPairs: games.reduce((s, g) => s + g.pairs, 0),
+    totalScore: games.reduce((s, g) => s + g.score, 0),
+    favoriteMode: mostCommon(games.map(g => g.mode === 'freeplay' ? 'Freeplay' : 'Survival')),
+    favoriteGrid: mostCommon(games.map(g => `${g.rows}×${g.cols}`)),
+    avgPairTime: avgTimeToPair(games),
+  };
+}
+
+function computeFreeplayStats(games: GameRecord[]) {
+  const fp = games.filter(g => g.mode === 'freeplay');
+  if (fp.length === 0) return null;
+  return {
+    totalGames: fp.length,
+    bestScore: Math.max(...fp.map(g => g.score)),
+    bestTime: Math.min(...fp.map(g => g.timeMs)),
+    favoriteGrid: mostCommon(fp.map(g => `${g.rows}×${g.cols}`)),
+    avgPairTime: avgTimeToPair(fp),
+  };
+}
+
+function computeSurvivalStats(games: GameRecord[]) {
+  const sv = games.filter(g => g.mode === 'survival');
+  if (sv.length === 0) return null;
+  const stages = sv.map(g => g.stage ?? 1);
+  const totalPairs = sv.reduce((s, g) => s + g.pairs, 0);
+  const totalClutch = sv.reduce((s, g) => s + (g.clutchPairs ?? 0), 0);
+  return {
+    totalRuns: sv.length,
+    highestStage: Math.max(...stages),
+    bestScore: Math.max(...sv.map(g => g.score)),
+    avgStage: stages.reduce((s, n) => s + n, 0) / stages.length,
+    clutchPairs: totalClutch,
+    clutchRate: totalPairs > 0 ? `${((totalClutch / totalPairs) * 100).toFixed(1)}%` : '—',
+  };
+}
+
+// ---- Sub-components ----
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  const display = typeof value === 'number' ? value.toLocaleString() : value;
+  return (
+    <div className={classes['stat-card']}>
+      <div className={classes['stat-label']}>{label}</div>
+      <div className={classes['stat-value']}>{display}</div>
+    </div>
+  );
+}
+
+function EmptyStats({ tab }: { tab: Tab }) {
+  const label = tab === 'survival' ? 'survival runs' : tab === 'freeplay' ? 'freeplay games' : 'games';
+  return (
+    <div className={classes['stats-empty-card']}>
+      No {label} yet. <a href="/" className={classes['play-link']}>Play now!</a>
+    </div>
+  );
+}
+
+// ---- Main component ----
 
 export default function ProfilePage() {
   const { user, isLoading } = useAuth();
@@ -24,56 +95,100 @@ export default function ProfilePage() {
 
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditingBio, setIsEditingBio] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
+  const [bioError, setBioError] = useState('');
 
   const [games, setGames] = useState<GameRecord[]>([]);
   const [gamesLoading, setGamesLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>('global');
 
   useEffect(() => {
-    if (!isLoading && !user) {
-      router.push('/sign-in');
-    }
+    if (!isLoading && !user) router.push('/sign-in');
   }, [user, isLoading, router]);
 
   useEffect(() => {
     if (!user) return;
-    fetchUserAttributes().then((attrs) => {
+    fetchUserAttributes().then(attrs => {
       setUsername(attrs.preferred_username ?? '');
     }).catch(() => {});
-    getUser(user.userId).then((record) => {
+    getUser(user.userId).then(record => {
       setBio((record?.bio as string) ?? '');
     }).catch(() => {});
-    getUserGames(user.userId).then((records) => {
-      setGames(records);
-    }).catch(() => {}).finally(() => setGamesLoading(false));
+    getUserGames(user.userId).then(setGames).catch(() => {}).finally(() => setGamesLoading(false));
   }, [user]);
 
-  async function handleSave() {
+  async function handleSaveBio() {
     if (!user) return;
-    setErrorMsg('');
+    setBioError('');
     setSaveStatus('idle');
     setIsSaving(true);
     try {
       await updateUser(user.userId, { bio });
-      setIsEditing(false);
+      setIsEditingBio(false);
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 2500);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to save');
+      setBioError(err instanceof Error ? err.message : 'Failed to save.');
       setSaveStatus('error');
     } finally {
       setIsSaving(false);
     }
   }
 
-  if (isLoading || !user) {
-    return <div className={classes.loading}>Loading...</div>;
-  }
+  if (isLoading || !user) return <div className={classes.loading}>Loading...</div>;
 
-  const stats = computeStats(games);
+  const globalStats = computeGlobalStats(games);
+  const freeplayStats = computeFreeplayStats(games);
+  const survivalStats = computeSurvivalStats(games);
+  const filteredGames = activeTab === 'global' ? games : games.filter(g => g.mode === activeTab);
+
+  function renderStats() {
+    if (gamesLoading) {
+      return (
+        <div className={classes['stats-grid']}>
+          {[0, 1, 2, 3].map(i => <StatCard key={i} label="—" value="—" />)}
+        </div>
+      );
+    }
+    if (activeTab === 'global') {
+      if (!globalStats) return <EmptyStats tab="global" />;
+      return (
+        <div className={classes['stats-grid']}>
+          <StatCard label="Total Games" value={globalStats.totalGames} />
+          <StatCard label="Total Pairs" value={globalStats.totalPairs} />
+          <StatCard label="Lifetime Score" value={globalStats.totalScore} />
+          <StatCard label="Favorite Mode" value={globalStats.favoriteMode} />
+          <StatCard label="Favorite Grid" value={globalStats.favoriteGrid} />
+          <StatCard label="Avg Pair Time" value={globalStats.avgPairTime} />
+        </div>
+      );
+    }
+    if (activeTab === 'freeplay') {
+      if (!freeplayStats) return <EmptyStats tab="freeplay" />;
+      return (
+        <div className={classes['stats-grid']}>
+          <StatCard label="Total Games" value={freeplayStats.totalGames} />
+          <StatCard label="Best Score" value={freeplayStats.bestScore} />
+          <StatCard label="Best Time" value={formatTime(freeplayStats.bestTime)} />
+          <StatCard label="Favorite Grid" value={freeplayStats.favoriteGrid} />
+          <StatCard label="Avg Pair Time" value={freeplayStats.avgPairTime} />
+        </div>
+      );
+    }
+    if (!survivalStats) return <EmptyStats tab="survival" />;
+    return (
+      <div className={classes['stats-grid']}>
+        <StatCard label="Total Runs" value={survivalStats.totalRuns} />
+        <StatCard label="Highest Stage" value={survivalStats.highestStage} />
+        <StatCard label="Best Score" value={survivalStats.bestScore} />
+        <StatCard label="Avg Stage" value={survivalStats.avgStage.toFixed(1)} />
+        <StatCard label="Clutch Pairs" value={survivalStats.clutchPairs} />
+        <StatCard label="Clutch Rate" value={survivalStats.clutchRate} />
+      </div>
+    );
+  }
 
   return (
     <main className={classes.page}>
@@ -92,23 +207,21 @@ export default function ProfilePage() {
           <div className={classes['profile-info']}>
             <div className={classes['username-display']}>{username}</div>
 
-            {isEditing ? (
+            {isEditingBio ? (
               <>
                 <textarea
                   value={bio}
-                  onChange={(e) => setBio(e.target.value)}
+                  onChange={e => setBio(e.target.value)}
                   className={classes['bio-input']}
                   placeholder="Add a bio about yourself..."
                   autoFocus
                 />
-                {saveStatus === 'error' && <p className={classes.error}>{errorMsg}</p>}
+                {saveStatus === 'error' && <p className={classes.error}>{bioError}</p>}
                 <div className={classes['bio-actions']}>
-                  <button className={classes['save-btn']} onClick={handleSave} disabled={isSaving}>
+                  <button className={classes['save-btn']} onClick={handleSaveBio} disabled={isSaving}>
                     {isSaving ? 'Saving...' : 'Save'}
                   </button>
-                  <button className={classes['cancel-link']} onClick={() => setIsEditing(false)}>
-                    Cancel
-                  </button>
+                  <button className={classes['cancel-link']} onClick={() => setIsEditingBio(false)}>Cancel</button>
                 </div>
               </>
             ) : (
@@ -117,60 +230,54 @@ export default function ProfilePage() {
                   {bio || <span className={classes['bio-placeholder']}>No bio yet.</span>}
                 </p>
                 {saveStatus === 'success' && <p className={classes.success}>Saved!</p>}
-                <button className={classes['edit-link']} onClick={() => setIsEditing(true)}>
-                  Edit
-                </button>
+                <button className={classes['edit-link']} onClick={() => setIsEditingBio(true)}>Edit</button>
               </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className={classes['stats-grid']}>
-        <div className={classes['stat-card']}>
-          <div className={classes['stat-label']}>Total Games</div>
-          <div className={classes['stat-value']}>{gamesLoading ? '—' : (stats?.totalGames ?? 0)}</div>
-        </div>
-        <div className={classes['stat-card']}>
-          <div className={classes['stat-label']}>Best Score</div>
-          <div className={classes['stat-value']}>
-            {gamesLoading ? '—' : stats ? stats.bestScore.toLocaleString() : '—'}
-          </div>
-        </div>
-        <div className={classes['stat-card']}>
-          <div className={classes['stat-label']}>Avg. Time</div>
-          <div className={classes['stat-value']}>
-            {gamesLoading ? '—' : stats ? formatTime(stats.avgTimeMs) : '—'}
-          </div>
-        </div>
-        <div className={classes['stat-card']}>
-          <div className={classes['stat-label']}>Win Rate</div>
-          <div className={classes['stat-value']}>—</div>
-        </div>
+      {/* Tab toggle */}
+      <div className={classes['tab-toggle']}>
+        {(['global', 'freeplay', 'survival'] as Tab[]).map(tab => (
+          <button
+            key={tab}
+            className={`${classes['tab-btn']}${activeTab === tab ? ` ${classes['tab-btn-active']}` : ''}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
       </div>
+
+      {/* Stats */}
+      {renderStats()}
 
       {/* Recent games */}
       <div className={classes['games-card']}>
         <div className={classes['games-header']}>Recent Games</div>
         <div className={classes['games-table-head']}>
-          {GAMES_COLUMNS.map((col) => (
-            <span key={col}>{col}</span>
-          ))}
+          <span>Date</span>
+          {activeTab === 'global' && <span>Mode</span>}
+          {activeTab === 'freeplay' && <span>Grid</span>}
+          {activeTab === 'survival' && <span>Stage</span>}
+          <span>Score</span>
+          <span>Time</span>
         </div>
         {gamesLoading ? (
           <div className={classes['games-empty']}>Loading...</div>
-        ) : games.length === 0 ? (
+        ) : filteredGames.length === 0 ? (
           <div className={classes['games-empty']}>
-            No games recorded yet.{' '}
-            <a href="/" className={classes['play-link']}>Play now!</a>
+            No games recorded yet. <a href="/" className={classes['play-link']}>Play now!</a>
           </div>
         ) : (
           <div className={classes['games-rows']}>
-            {games.map((g) => (
+            {filteredGames.map(g => (
               <div key={g.gameId} className={classes['games-row']}>
                 <span>{new Date(g.completedAt).toLocaleDateString()}</span>
-                <span className={classes[`mode-${g.mode}`]}>{g.mode}</span>
+                {activeTab === 'global' && <span className={classes[`mode-${g.mode}`]}>{g.mode}</span>}
+                {activeTab === 'freeplay' && <span>{g.rows}×{g.cols}</span>}
+                {activeTab === 'survival' && <span>Stage {g.stage ?? 1}</span>}
                 <span>{g.score.toLocaleString()}</span>
                 <span>{formatTime(g.timeMs)}</span>
               </div>

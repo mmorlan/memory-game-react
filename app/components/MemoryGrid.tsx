@@ -112,7 +112,7 @@ function Lives({ count, max = 3 }: { count: number; max?: number }) {
 
 function FreeplayBoard() {
   const { user } = useAuth();
-  const { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed } = useMemoryGame();
+  const { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs } = useMemoryGame();
   const [pendingRows, setPendingRows] = useState(rows);
   const [pendingCols, setPendingCols] = useState(cols);
   const savedRef = useRef(false);
@@ -143,6 +143,7 @@ function FreeplayBoard() {
       pairs,
       completedAt: now,
       leaderboardKey: "freeplay",
+      avgTimeToPairMs: getAvgTimeToPairMs(),
     }).catch(console.error);
   }, [allMatched, started, user, rows, cols, score, elapsed]);
 
@@ -225,9 +226,9 @@ function SurvivalBoard() {
   const { user } = useAuth();
   const {
     board, rows, cols,
-    stage, lives, completions, score,
+    stage, lives, completions, score, clutchPairs,
     started, gameOver, timeLeft,
-    handleCardClick, startGame, resetGame,
+    handleCardClick, startGame, resetGame, getAvgTimeToPairMs,
   } = useSurvivalGame();
 
   const startedAtRef = useRef<number>(0);
@@ -257,6 +258,9 @@ function SurvivalBoard() {
       stage,
       completedAt: now,
       leaderboardKey: "survival",
+      avgTimeToPairMs: getAvgTimeToPairMs(),
+      clutchPairs,
+      survived: false,
     }).catch(console.error);
   }, [gameOver, user, rows, cols, score, stage]);
 

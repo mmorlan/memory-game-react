@@ -52,6 +52,8 @@ export default function useMemoryGame() {
   const [started, setStarted] = useState(false);
   const [score, setScore] = useState(0);
   const lastPairTimeRef = useRef<number>(Date.now());
+  const totalPairTimeMsRef = useRef(0);
+  const matchedPairCountRef = useRef(0);
 
   const allMatched = board.filter(c => c.iconName !== "__blank__").every(c => c.matched);
   const elapsed = useStopwatch(started && !allMatched, startTime, endTime);
@@ -84,6 +86,8 @@ export default function useMemoryGame() {
         const now = Date.now();
         const timeToPair = now - lastPairTimeRef.current;
         lastPairTimeRef.current = now;
+        totalPairTimeMsRef.current += timeToPair;
+        matchedPairCountRef.current++;
         const totalPairs = Math.floor((rows * cols) / 2);
         setScore(prev => prev + calcPairScore(totalPairs, timeToPair));
       } else {
@@ -107,6 +111,8 @@ export default function useMemoryGame() {
     setStarted(true);
     setScore(0);
     lastPairTimeRef.current = Date.now();
+    totalPairTimeMsRef.current = 0;
+    matchedPairCountRef.current = 0;
   }
 
   function resetGame(): void {
@@ -116,7 +122,14 @@ export default function useMemoryGame() {
     setStarted(false);
     setScore(0);
     lastPairTimeRef.current = Date.now();
+    totalPairTimeMsRef.current = 0;
+    matchedPairCountRef.current = 0;
   }
 
-  return { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed };
+  function getAvgTimeToPairMs(): number {
+    if (matchedPairCountRef.current === 0) return 0;
+    return Math.round(totalPairTimeMsRef.current / matchedPairCountRef.current);
+  }
+
+  return { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs };
 }

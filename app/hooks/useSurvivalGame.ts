@@ -29,7 +29,10 @@ export default function useSurvivalGame() {
   const [gameOver, setGameOver] = useState(false);
   const [timerKey, setTimerKey] = useState(0);
   const [score, setScore] = useState(0);
+  const [clutchPairs, setClutchPairs] = useState(0);
   const lastPairTimeRef = useRef<number>(Date.now());
+  const totalPairTimeMsRef = useRef(0);
+  const matchedPairCountRef = useRef(0);
 
   const { rows, cols } = getGridForStage(stage);
   const allMatched = board.filter((c) => c.iconName !== "__blank__").every((c) => c.matched);
@@ -111,6 +114,9 @@ export default function useSurvivalGame() {
         const now = Date.now();
         const timeToPair = now - lastPairTimeRef.current;
         lastPairTimeRef.current = now;
+        totalPairTimeMsRef.current += timeToPair;
+        matchedPairCountRef.current++;
+        if (timerActive && timeLeft <= 3_000) setClutchPairs((prev) => prev + 1);
         const totalPairs = Math.floor((rows * cols) / 2);
         const ldm = getLDM(completionsRef.current);
         setScore((prev) => prev + calcPairScore(totalPairs, timeToPair, ldm));
@@ -136,7 +142,10 @@ export default function useSurvivalGame() {
     setGameOver(false);
     setStarted(true);
     setScore(0);
+    setClutchPairs(0);
     lastPairTimeRef.current = Date.now();
+    totalPairTimeMsRef.current = 0;
+    matchedPairCountRef.current = 0;
   }
 
   function resetGame(): void {
@@ -149,13 +158,21 @@ export default function useSurvivalGame() {
     setBoard(createShuffledBoard(4, 4));
     setTimerKey((k) => k + 1);
     setScore(0);
+    setClutchPairs(0);
     lastPairTimeRef.current = Date.now();
+    totalPairTimeMsRef.current = 0;
+    matchedPairCountRef.current = 0;
+  }
+
+  function getAvgTimeToPairMs(): number {
+    if (matchedPairCountRef.current === 0) return 0;
+    return Math.round(totalPairTimeMsRef.current / matchedPairCountRef.current);
   }
 
   return {
     board, rows, cols,
-    stage, lives, completions, score,
+    stage, lives, completions, score, clutchPairs,
     started, gameOver, timeLeft,
-    handleCardClick, startGame, resetGame,
+    handleCardClick, startGame, resetGame, getAvgTimeToPairMs,
   };
 }

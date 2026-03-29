@@ -64,7 +64,10 @@ export interface GameRecord {
   pairs: number;
   completedAt: string;
   leaderboardKey: string;
-  stage?: number; // survival only
+  stage?: number;           // survival only
+  avgTimeToPairMs?: number; // freeplay + survival
+  clutchPairs?: number;     // survival only
+  survived?: boolean;       // survival only
 }
 
 export async function saveGame(userId: string, game: Omit<GameRecord, "userId">): Promise<void> {
