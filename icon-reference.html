@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Icon Reference</title>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    body { background: #111827; color: #fff; font-family: sans-serif; padding: 2rem; }
+    h1 { color: #84cc16; margin-bottom: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 1rem; }
+    .icon-card {
+      align-items: center;
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 0.5rem;
+      cursor: default;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 1rem 0.5rem;
+    }
+    .icon-card:hover { border-color: #84cc16; }
+    .icon-card span { color: #9ca3af; font-size: 0.65rem; text-align: center; word-break: break-word; }
+    svg { color: #fff; }
+  </style>
+</head>
+<body>
+  <h1>Memory Game Icons</h1>
+  <h2 style="color:#84cc16;margin-bottom:1rem">Standard (Freeplay + Survival Level 1)</h2>
+  <div class="grid" id="grid"></div>
+  <h2 style="color:#f97316;margin:2rem 0 1rem">Similar (Survival Level 2/3 only)</h2>
+  <div class="grid" id="similar-grid"></div>
+
+  <script>
+    const similar = [
+      "arrow-big-down","arrow-big-left","arrow-big-up","arrow-big-right",
+      "book-check","book-heart","book-image","book-plus",
+      "chart-no-axes-column","chart-no-axes-column-decreasing","chart-no-axes-column-increasing",
+      "cloud-drizzle","cloud-fog","cloud-lightning","cloud-rain-wind","cloud-sun","cloudy",
+      "clock-1","clock-3","clock-5","clock-8","clock-10",
+      "dice-1","dice-2","dice-3","dice-4","dice-5","dice-6",
+    ];
+
+    const icons = [
+      "alarm-clock","baby","banana","bath","bed","bell","birdhouse","book",
+      "carrot","cat","coffee","cone","crown","cup-soda",
+      "dog","dollar-sign","donut","droplet","drum","drumstick",
+      "dumbbell","ear","egg","feather","fish","footprints","gamepad","gem",
+      "ghost","gift","glasses","globe","guitar","hammer","hand","headphones",
+      "heart","hourglass","house","ice-cream-cone","key","keyboard","lamp",
+      "landmark","laugh","lightbulb","lock","magnet","mail","martini","medal",
+      "milk","moon","mountain","music","nut","paintbrush","palette",
+      "party-popper","pi","pickaxe","pizza","plane","popcorn","popsicle",
+      "puzzle","rabbit","rainbow","rose","ruler","sailboat","shell","soup",
+      "sprout","star","sun","thermometer","tornado","volleyball","zap"
+    ];
+
+    const grid = document.getElementById("grid");
+    const similarGrid = document.getElementById("similar-grid");
+
+    icons.forEach(name => {
+      const card = document.createElement("div");
+      card.className = "icon-card";
+      card.innerHTML = `<i data-lucide="${name}" width="32" height="32"></i><span>${name}</span>`;
+      grid.appendChild(card);
+    });
+
+    similar.forEach(name => {
+      const card = document.createElement("div");
+      card.className = "icon-card";
+      card.innerHTML = `<i data-lucide="${name}" width="32" height="32"></i><span>${name}</span>`;
+      similarGrid.appendChild(card);
+    });
+
+    lucide.createIcons();
+  </script>
+</body>
+</html>

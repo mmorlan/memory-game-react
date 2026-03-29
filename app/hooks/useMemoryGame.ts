@@ -11,12 +11,14 @@ export interface Card {
   matched: boolean;
 }
 
-export function createShuffledBoard(rows: number, cols: number): Card[] {
+export function createShuffledBoard(rows: number, cols: number, similarIconNames: string[] = []): Card[] {
   const total = rows * cols;
   const pairs = Math.floor(total / 2);
   const hasBlank = total % 2 === 1;
 
-  const shuffledIcons = [...ICON_NAMES].sort(() => Math.random() - 0.5).slice(0, pairs);
+  const standardNeeded = pairs - similarIconNames.length;
+  const standardIcons = [...ICON_NAMES].sort(() => Math.random() - 0.5).slice(0, standardNeeded);
+  const shuffledIcons = [...similarIconNames, ...standardIcons].sort(() => Math.random() - 0.5);
   const doubled = [...shuffledIcons, ...shuffledIcons];
   for (let i = doubled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));

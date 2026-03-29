@@ -2,10 +2,45 @@ import { useState, useEffect, useRef } from "react";
 import { Card, createShuffledBoard } from "./useMemoryGame";
 import useCountdown from "./useCountdown";
 import { calcPairScore } from "../util/scoring";
+import { SIMILAR_ICON_GROUPS } from "../components/icons";
 
 const STAGE_DURATION_MS = 60_000;
 const COMPLETIONS_PER_STAGE = 3;
 const MAX_LIVES = 3;
+
+// Returns how many similar icon pairs to use for a given level/stage.
+// Level 1 (completions=0) always uses standard icons only.
+// Formula: N + (S - 1) where N = level number (2 or 3), S = stage.
+function getSimilarCount(completions: number, stage: number): number {
+  if (completions === 0) return 0;
+  return (completions + 1) + (stage - 1);
+}
+
+// Selects `count` similar icon names from SIMILAR_ICON_GROUPS.
+// Each group used must contribute ≥ 2 icons.
+function selectSimilarIcons(count: number): string[] {
+  if (count === 0) return [];
+  const groups = SIMILAR_ICON_GROUPS
+    .map(g => [...g].sort(() => Math.random() - 0.5))
+    .sort(() => Math.random() - 0.5);
+
+  const result: string[] = [];
+  let remaining = count;
+
+  for (let i = 0; i < groups.length && remaining > 0; i++) {
+    const group = groups[i];
+    const maxTake = Math.min(group.length, remaining);
+    if (maxTake < 2) break;
+    // Leave at least 2 for the next group if more is needed, otherwise take all remaining
+    const take = remaining <= maxTake
+      ? remaining
+      : Math.min(maxTake, remaining - 2);
+    result.push(...group.slice(0, Math.max(take, 2)));
+    remaining -= Math.max(take, 2);
+  }
+
+  return result;
+}
 
 function getGridForStage(stage: number) {
   const size = Math.min(stage + 3, 12); // Stage 1→4, Stage 2→5, ..., Stage 9→12 (max)
@@ -62,11 +97,11 @@ export default function useSurvivalGame() {
         const { rows: r, cols: c } = getGridForStage(nextStage);
         setStage(nextStage);
         setCompletions(0);
-        setBoard(createShuffledBoard(r, c));
+        setBoard(createShuffledBoard(r, c)); // Level 1 of next stage — standard icons only
       } else {
         const { rows: r, cols: c } = getGridForStage(currentStage);
         setCompletions(newCompletions);
-        setBoard(createShuffledBoard(r, c));
+        setBoard(createShuffledBoard(r, c, selectSimilarIcons(getSimilarCount(newCompletions, currentStage))));
       }
       setTimerActive(false);
       setTimerKey((k) => k + 1);
@@ -85,7 +120,7 @@ export default function useSurvivalGame() {
     } else {
       setLives(newLives);
       const { rows: r, cols: c } = getGridForStage(stageRef.current);
-      setBoard(createShuffledBoard(r, c));
+      setBoard(createShuffledBoard(r, c, selectSimilarIcons(getSimilarCount(completionsRef.current, stageRef.current))));
       setTimerActive(false);
       setTimerKey((k) => k + 1);
       lastPairTimeRef.current = Date.now();
