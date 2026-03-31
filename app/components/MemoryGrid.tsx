@@ -6,11 +6,12 @@ import "./MemoryGrid.css";
 import { ChevronDown } from "./icons";
 import { ICON_MAP } from "./icons";
 import useMemoryGame from "../hooks/useMemoryGame";
-import useSurvivalGame from "../hooks/useSurvivalGame";
+import useSurvivalGame, { COMPLETIONS_PER_STAGE } from "../hooks/useSurvivalGame";
 import { Card } from "../hooks/useMemoryGame";
 import useAuth from "../hooks/useAuth";
+import useGameSettings from "../hooks/useGameSettings";
 import { saveGame } from "../util/dynamodb";
-import { formatTime } from "../util/scoring";
+import { formatTime, getTimeMultiplier } from "../util/scoring";
 
 const GRID_OPTIONS = Array.from({ length: 9 }, (_, i) => i + 4);
 
@@ -55,6 +56,8 @@ function GameGrid({
   pendingCols,
   pendingRows,
   onCardClick,
+  cardsHidden,
+  revealAll = false,
 }: {
   board: Card[];
   cols: number;
@@ -62,6 +65,8 @@ function GameGrid({
   pendingCols: number;
   pendingRows: number;
   onCardClick: (id: number) => void;
+  cardsHidden: boolean;
+  revealAll?: boolean;
 }) {
   return (
     <div className="grid-container">
@@ -81,6 +86,23 @@ function GameGrid({
                 return <div key={card.id} className="memory-card blank-card" />;
               }
               const IconComponent = ICON_MAP[card.iconName];
+              if (cardsHidden) {
+                const isFlipped = revealAll || card.clicked || card.matched;
+                return (
+                  <div
+                    key={card.id}
+                    onClick={() => onCardClick(card.id)}
+                    className={`memory-card memory-card-flip${card.matched ? " matched" : ""}`}
+                  >
+                    <div className={`card-inner${isFlipped ? " flipped" : ""}`}>
+                      <div className="card-cover" />
+                      <div className="card-face">
+                        <IconComponent size={32} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div
                   key={card.id}
@@ -112,6 +134,7 @@ function Lives({ count, max = 3 }: { count: number; max?: number }) {
 
 function FreeplayBoard() {
   const { user } = useAuth();
+  const { cardsHidden } = useGameSettings();
   const { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs } = useMemoryGame();
   const [pendingRows, setPendingRows] = useState(rows);
   const [pendingCols, setPendingCols] = useState(cols);
@@ -206,6 +229,7 @@ function FreeplayBoard() {
         pendingRows={pendingRows}
         pendingCols={pendingCols}
         onCardClick={handleCardClick}
+        cardsHidden={cardsHidden}
       />
 
       <div className="stats-bar">
@@ -224,12 +248,20 @@ function FreeplayBoard() {
 
 function SurvivalBoard() {
   const { user } = useAuth();
+  const { cardsHidden } = useGameSettings();
   const {
     board, rows, cols,
     stage, lives, completions, score, clutchPairs,
-    started, gameOver, timeLeft,
-    handleCardClick, startGame, resetGame, getAvgTimeToPairMs,
+    started, gameOver, timeLeft, timerExpired, levelComplete, pendingStart,
+    stageDurationMs, ldm,
+    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, getAvgTimeToPairMs,
   } = useSurvivalGame();
+
+  const totalPairs = Math.floor((rows * cols) / 2);
+  const pm = totalPairs / 8;
+  const elapsed = stageDurationMs - timeLeft;
+  const tm = getTimeMultiplier(elapsed);
+  function fmt(n: number) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
 
   const startedAtRef = useRef<number>(0);
   const savedRef = useRef(false);
@@ -285,8 +317,8 @@ function SurvivalBoard() {
           <div className="survival-stat-stage">{stage}</div>
         </div>
         <div className="survival-stat">
-          <div className="survival-stat-label">Stage Progress</div>
-          <div className="survival-stat-value">{completions} / 3 Completions</div>
+          <div className="survival-stat-label">Level</div>
+          <div className="survival-stat-stage">{completions + 1}</div>
         </div>
         <div className="survival-stat">
           <div className="survival-stat-label">Lives</div>
@@ -300,23 +332,40 @@ function SurvivalBoard() {
           <div>
             <div className="timer-label">Stage Time</div>
             <div className={`timer-value${isLow ? " timer-value-danger" : ""}`}>
-              {started ? formatTime(timeLeft) : "1:00"}
+              {formatTime(timeLeft)}
             </div>
           </div>
         </div>
         <div className="scoring-box">
           <div className="scoring-label">Scoring Formula</div>
-          <div className="scoring-formula">100 pts × Grid × Time × Level Difficulty</div>
+          <div className="scoring-formula">100 × {fmt(pm)} × {fmt(tm)} × {fmt(ldm)}</div>
         </div>
       </div>
 
       <div className="game-buttons">
-        {!started && (
-          <button className="btn-start" onClick={startGame}>
+        {(!started || pendingStart) && !timerExpired && !levelComplete && (
+          <button className="btn-start" onClick={pendingStart ? beginLevel : startGame}>
             Start Game
           </button>
         )}
-        {started && <button onClick={resetGame}>New Game</button>}
+        {started && !pendingStart && !timerExpired && !levelComplete && (
+          <button onClick={resetGame}>New Game</button>
+        )}
+        {levelComplete && (
+          <button className="btn-start" onClick={advanceLevel}>
+            {completions + 1 >= COMPLETIONS_PER_STAGE ? "Next Stage →" : "Next Level →"}
+          </button>
+        )}
+        {timerExpired && lives > 1 && (
+          <button className="btn-danger" onClick={continueAfterTimeout}>
+            Continue ({lives - 1} {lives - 1 === 1 ? "life" : "lives"} left)
+          </button>
+        )}
+        {timerExpired && lives <= 1 && (
+          <button className="btn-danger" onClick={continueAfterTimeout}>
+            Game Over
+          </button>
+        )}
       </div>
 
       <GameGrid
@@ -326,6 +375,8 @@ function SurvivalBoard() {
         pendingRows={rows}
         pendingCols={cols}
         onCardClick={handleCardClick}
+        cardsHidden={cardsHidden}
+        revealAll={timerExpired}
       />
 
       <div className="stats-bar">

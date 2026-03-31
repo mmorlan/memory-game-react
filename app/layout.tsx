@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import AmplifyProvider from "./components/AmplifyProvider";
 import { AuthProvider } from "./hooks/useAuth";
+import { GameSettingsProvider } from "./hooks/useGameSettings";
 import Header from "./components/Header";
 
 export const metadata: Metadata = {
@@ -14,8 +15,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <AmplifyProvider>
           <AuthProvider>
-            <Header />
-            {children}
+            <GameSettingsProvider>
+              <Header />
+              {children}
+            </GameSettingsProvider>
           </AuthProvider>
         </AmplifyProvider>
       </body>

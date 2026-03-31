@@ -247,6 +247,52 @@
   color: #00ff3c;
 }
 
+/* Card flip (hidden mode) */
+.memory-card-flip {
+  border: none;
+  perspective: 600px;
+}
+
+.card-inner {
+  border-radius: 0.5rem;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+  width: 100%;
+}
+
+.card-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-cover,
+.card-face {
+  align-items: center;
+  backface-visibility: hidden;
+  border-radius: 0.5rem;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+  position: absolute;
+  width: 100%;
+}
+
+.card-cover {
+  background: #1f2937;
+  border: 2px solid #374151;
+}
+
+.card-face {
+  border: 2px solid #00ff3c;
+  transform: rotateY(180deg);
+}
+
+.memory-card-flip:hover .card-cover {
+  background: #2d3748;
+  border-color: #4b5563;
+}
+
 /* Preview card (grid size selection) */
 .preview-card {
   cursor: default;
@@ -289,6 +335,21 @@
 
 .btn-start:hover {
   background: #00cc30;
+}
+
+.btn-danger {
+  background: #ef4444;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
 }
 
 /* Win state */
