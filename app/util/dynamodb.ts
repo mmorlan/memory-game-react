@@ -1,5 +1,5 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, GetCommand, PutCommand, UpdateCommand, QueryCommand, BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 import { fetchAuthSession } from "aws-amplify/auth";
 
 async function getDocumentClient() {
@@ -63,7 +63,7 @@ export interface GameRecord {
   cols: number;
   pairs: number;
   completedAt: string;
-  leaderboardKey: string;
+  leaderboardkey: string;
   stage?: number;           // survival only
   avgTimeToPairMs?: number; // freeplay + survival
   clutchPairs?: number;     // survival only
@@ -76,6 +76,40 @@ export async function saveGame(userId: string, game: Omit<GameRecord, "userId">)
     TableName: "memory_games",
     Item: { userId, ...game },
   }));
+}
+
+export interface LeaderboardEntry extends GameRecord {
+  username?: string;
+}
+
+export async function getLeaderboard(leaderboardKey: string, limit = 10): Promise<LeaderboardEntry[]> {
+  const client = await getDocumentClient();
+  const result = await client.send(new QueryCommand({
+    TableName: "memory_games",
+    IndexName: "leaderboard",
+    KeyConditionExpression: "leaderboardkey = :key",
+    ExpressionAttributeValues: { ":key": leaderboardKey },
+    ScanIndexForward: false,
+    Limit: limit,
+  }));
+  const entries = (result.Items ?? []) as GameRecord[];
+  if (entries.length === 0) return [];
+
+  const userIds = [...new Set(entries.map(e => e.userId))];
+  const batchResult = await client.send(new BatchGetCommand({
+    RequestItems: {
+      memory_users: {
+        Keys: userIds.map(id => ({ userID: id })),
+        ProjectionExpression: "userID, username",
+      },
+    },
+  }));
+  const usernameMap: Record<string, string> = {};
+  (batchResult.Responses?.memory_users ?? []).forEach((u) => {
+    if (u.userID && u.username) usernameMap[u.userID as string] = u.username as string;
+  });
+
+  return entries.map(e => ({ ...e, username: usernameMap[e.userId] }));
 }
 
 export async function getUserGames(userId: string): Promise<GameRecord[]> {

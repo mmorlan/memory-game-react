@@ -165,7 +165,7 @@ function FreeplayBoard() {
       cols,
       pairs,
       completedAt: now,
-      leaderboardKey: "freeplay",
+      leaderboardkey: "freeplay",
       avgTimeToPairMs: getAvgTimeToPairMs(),
     }).catch(console.error);
   }, [allMatched, started, user, rows, cols, score, elapsed]);
@@ -289,7 +289,7 @@ function SurvivalBoard() {
       pairs,
       stage,
       completedAt: now,
-      leaderboardKey: "survival",
+      leaderboardkey: "survival",
       avgTimeToPairMs: getAvgTimeToPairMs(),
       clutchPairs,
       survived: false,

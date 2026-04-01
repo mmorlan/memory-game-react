@@ -45,10 +45,10 @@ export default function Header() {
           {cardsHidden ? <EyeOff size={16} /> : <Eye size={16} />}
           <span>{cardsHidden ? "Hidden" : "Visible"}</span>
         </button>
-        <button className="header-btn">
+        <Link href="/leaderboard" className="header-btn">
           <Trophy size={16} color="#84cc16" />
           <span>Leaderboard</span>
-        </button>
+        </Link>
       </nav>
     </header>
   );
