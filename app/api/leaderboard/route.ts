@@ -1,37 +1,42 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, QueryCommand, BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 
 function getClient() {
-  const client = new DynamoDBClient({
+  return DynamoDBDocumentClient.from(new DynamoDBClient({
     region: process.env.NEXT_PUBLIC_AWS_REGION!,
     credentials: {
       accessKeyId: process.env.AWS_READONLY_KEY_ID!,
       secretAccessKey: process.env.AWS_READONLY_SECRET!,
     },
-  });
-  return DynamoDBDocumentClient.from(client);
+  }));
 }
 
-export async function GET(req: NextRequest) {
-  const mode = req.nextUrl.searchParams.get("mode") ?? "freeplay";
+async function queryMode(client: DynamoDBDocumentClient, mode: string) {
+  const result = await client.send(new QueryCommand({
+    TableName: "memory_games",
+    IndexName: "leaderboard",
+    KeyConditionExpression: "leaderboardkey = :key",
+    ExpressionAttributeValues: { ":key": mode },
+    ScanIndexForward: false,
+    Limit: 100,
+  }));
+  return result.Items ?? [];
+}
 
+export async function GET() {
   try {
     const client = getClient();
 
-    const result = await client.send(new QueryCommand({
-      TableName: "memory_games",
-      IndexName: "leaderboard",
-      KeyConditionExpression: "leaderboardkey = :key",
-      ExpressionAttributeValues: { ":key": mode },
-      ScanIndexForward: false,
-      Limit: 100,
-    }));
+    const [freeplayItems, survivalItems] = await Promise.all([
+      queryMode(client, "freeplay"),
+      queryMode(client, "survival"),
+    ]);
 
-    const entries = result.Items ?? [];
-    if (entries.length === 0) return NextResponse.json([]);
+    const allItems = [...freeplayItems, ...survivalItems];
+    if (allItems.length === 0) return NextResponse.json({ freeplay: [], survival: [] });
 
-    const userIds = [...new Set(entries.map(e => e.userId as string))];
+    const userIds = [...new Set(allItems.map(e => e.userId as string))];
     const batchResult = await client.send(new BatchGetCommand({
       RequestItems: {
         memory_users: {
@@ -46,8 +51,13 @@ export async function GET(req: NextRequest) {
       if (u.userID && u.username) usernameMap[u.userID as string] = u.username as string;
     });
 
-    const enriched = entries.map(e => ({ ...e, username: usernameMap[e.userId as string] }));
-    return NextResponse.json(enriched);
+    const enrich = (items: Record<string, unknown>[]) =>
+      items.map(e => ({ ...e, username: usernameMap[e.userId as string] }));
+
+    return NextResponse.json({
+      freeplay: enrich(freeplayItems),
+      survival: enrich(survivalItems),
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: message }, { status: 500 });

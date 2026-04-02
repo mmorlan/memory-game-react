@@ -2,10 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { signUp, signIn, confirmSignUp } from 'aws-amplify/auth';
+import { signUp, resendSignUpCode } from 'aws-amplify/auth';
 import { UserPlus, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
-import useAuth from '../hooks/useAuth';
 import { isValidEmail } from '../util/validation';
 import classes from '../components/auth.module.css';
 
@@ -68,22 +66,23 @@ function PasswordInput({
 }
 
 export default function RegisterPage() {
-  const router = useRouter();
-  const { checkAuth } = useAuth();
-
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [resent, setResent] = useState(false);
 
   async function handleSignUp(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
 
+    if (!username.trim()) {
+      setError('Please enter a username.');
+      return;
+    }
     if (!isValidEmail(email)) {
       setError('Please enter a valid email address.');
       return;
@@ -113,23 +112,14 @@ export default function RegisterPage() {
     }
   }
 
-  async function handleConfirm(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleResend() {
+    setResent(false);
     setError('');
-    setIsSubmitting(true);
     try {
-      await confirmSignUp({ username: email, confirmationCode: code });
-      await signIn({
-        username: email,
-        password,
-        options: { authFlowType: 'USER_PASSWORD_AUTH' },
-      });
-      await checkAuth();
-      router.push('/');
+      await resendSignUpCode({ username: email });
+      setResent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -141,32 +131,26 @@ export default function RegisterPage() {
             <Mail size={28} />
           </div>
           <h1 className={classes.title}>Check Your Email</h1>
-          <p className={classes.subtitle}>Enter the verification code we sent to {email}</p>
+          <p className={classes.subtitle}>
+            We sent a verification link to <strong>{email}</strong>. Click it to confirm your account, then sign in.
+          </p>
 
-          <form onSubmit={handleConfirm}>
-            <div className={classes['field-group']}>
-              <div className={classes.field}>
-                <label htmlFor="code" className={classes['field-label']}>
-                  <Mail size={12} /> Confirmation Code
-                </label>
-                <input
-                  id="code"
-                  type="text"
-                  name="code"
-                  required
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  className={classes.input}
-                />
-              </div>
-            </div>
+          {error && <p className={classes.error}>{error}</p>}
+          {resent && <p className={classes.hint}>Link resent!</p>}
 
-            {error && <p className={classes.error}>{error}</p>}
+          <Link href="/sign-in" className={classes['primary-btn']}>
+            Go to Sign In
+          </Link>
 
-            <button type="submit" disabled={isSubmitting} className={classes['primary-btn']}>
-              {isSubmitting ? 'Confirming...' : 'Confirm'}
-            </button>
-          </form>
+          <div className={classes.divider}>
+            <div className={classes['divider-line']} />
+            <span className={classes['divider-text']}>didn&apos;t get it?</span>
+            <div className={classes['divider-line']} />
+          </div>
+
+          <button type="button" onClick={handleResend} className={classes['secondary-btn']}>
+            Resend Link
+          </button>
         </div>
       </div>
     );

@@ -64,11 +64,12 @@ export interface GameRecord {
   pairs: number;
   completedAt: string;
   leaderboardkey: string;
-  stage?: number;           // survival only
-  avgTimeToPairMs?: number; // freeplay + survival
-  clutchPairs?: number;     // survival only
-  survived?: boolean;       // survival only
-  remainingPairs?: number;  // survival only
+  device?: "desktop" | "mobile"; // device used to play
+  stage?: number;                // survival only
+  avgTimeToPairMs?: number;      // freeplay + survival
+  clutchPairs?: number;          // survival only
+  survived?: boolean;            // survival only
+  remainingPairs?: number;       // survival only
 }
 
 export async function saveGame(userId: string, game: Omit<GameRecord, "userId">): Promise<void> {

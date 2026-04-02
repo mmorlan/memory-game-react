@@ -6,7 +6,7 @@ import "./MemoryGrid.css";
 import { ChevronDown } from "./icons";
 import { ICON_MAP } from "./icons";
 import useMemoryGame from "../hooks/useMemoryGame";
-import useSurvivalGame, { COMPLETIONS_PER_STAGE } from "../hooks/useSurvivalGame";
+import useSurvivalGame, { COMPLETIONS_PER_STAGE, MAX_LIVES } from "../hooks/useSurvivalGame";
 import { Card } from "../hooks/useMemoryGame";
 import useAuth from "../hooks/useAuth";
 import useGameSettings from "../hooks/useGameSettings";
@@ -14,6 +14,30 @@ import { saveGame } from "../util/dynamodb";
 import { formatTime, getTimeMultiplier } from "../util/scoring";
 
 const GRID_OPTIONS = Array.from({ length: 9 }, (_, i) => i + 4);
+
+function getDevice(): "desktop" | "mobile" {
+  return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    ? "mobile" : "desktop";
+}
+
+function fmt(n: number) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
+
+function ScoringFormula({ terms }: { terms: { value: string; label: string }[] }) {
+  return (
+    <div className="scoring-box">
+      <div className="scoring-label">Scoring Formula</div>
+      <div className="scoring-formula-row">
+        {terms.flatMap((t, i) => [
+          ...(i > 0 ? [<span key={`op-${i}`} className="scoring-op">×</span>] : []),
+          <div key={t.label} className="scoring-term">
+            <div className="scoring-value">{t.value}</div>
+            <div className="scoring-term-label">{t.label}</div>
+          </div>,
+        ])}
+      </div>
+    </div>
+  );
+}
 
 function GridSelect({ value, onChange }: { value: number; onChange: (n: number) => void }) {
   const [open, setOpen] = useState(false);
@@ -166,6 +190,7 @@ function FreeplayBoard() {
       pairs,
       completedAt: now,
       leaderboardkey: "freeplay",
+      device: getDevice(),
       avgTimeToPairMs: getAvgTimeToPairMs(),
     }).catch(console.error);
   }, [allMatched, started, user, rows, cols, score, elapsed]);
@@ -228,10 +253,11 @@ function FreeplayBoard() {
           <Clock size={18} color="#84cc16" />
           <div className="timer-value">{started ? formatTime(elapsed) : "0:00"}</div>
         </div>
-        <div className="scoring-box">
-          <div className="scoring-label">Scoring Formula</div>
-          <div className="scoring-formula">100 pts × Grid Multiplier × Time Multiplier</div>
-        </div>
+        <ScoringFormula terms={[
+          { value: "100", label: "Base" },
+          { value: fmt(Math.floor((started ? rows * cols : pendingRows * pendingCols) / 2) / 8), label: "Grid" },
+          { value: fmt(getTimeMultiplier(elapsed)), label: "Time" },
+        ]} />
       </div>
 
       <div className="game-buttons">
@@ -275,17 +301,22 @@ function SurvivalBoard() {
   const { cardsHidden } = useGameSettings();
   const {
     board, rows, cols,
-    stage, lives, completions, score, clutchPairs,
-    started, gameOver, timeLeft, timerExpired, levelComplete, pendingStart,
+    stage, lives, completions, score, clutchPairs, livesPurchased,
+    started, gameOver, survived, timeLeft, timerExpired, levelComplete, pendingStart,
     stageDurationMs, ldm,
-    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, getAvgTimeToPairMs,
+    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs,
   } = useSurvivalGame();
+
+  const lifeCostFraction = 0.10 + livesPurchased * 0.05;
+  const canBuyLife = lifeCostFraction <= 1.0;
+  const lifeCostPct = Math.round(lifeCostFraction * 100);
+  const lifeCost = Math.round(score * lifeCostFraction);
+  const nextLifeCostPct = lifeCostPct + 5;
 
   const totalPairs = Math.floor((rows * cols) / 2);
   const pm = totalPairs / 8;
   const elapsed = stageDurationMs - timeLeft;
   const tm = getTimeMultiplier(elapsed);
-  function fmt(n: number) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
 
   const startedAtRef = useRef<number>(0);
   const savedRef = useRef(false);
@@ -315,7 +346,7 @@ function SurvivalBoard() {
         leaderboardkey: "survival",
         avgTimeToPairMs: getAvgTimeToPairMs(),
         clutchPairs,
-        survived: false,
+        survived,
         remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
       }).catch(console.error);
     }
@@ -339,12 +370,24 @@ function SurvivalBoard() {
       stage,
       completedAt: now,
       leaderboardkey: "survival",
+      device: getDevice(),
       avgTimeToPairMs: getAvgTimeToPairMs(),
       clutchPairs,
-      survived: false,
+      survived,
       remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
     }).catch(console.error);
   }, [gameOver, user, rows, cols, score, stage]);
+
+  if (gameOver && survived) {
+    return (
+      <div className="game-over">
+        <div className="game-over-title" style={{ color: "#00ff3c" }}>You Survived!</div>
+        <div className="game-over-info">You cleared all 9 stages</div>
+        <div className="game-over-info">Final Score: {score.toLocaleString()}</div>
+        <button className="btn-start" onClick={resetGame}>Play Again</button>
+      </div>
+    );
+  }
 
   if (gameOver) {
     return (
@@ -372,7 +415,7 @@ function SurvivalBoard() {
         </div>
         <div className="survival-stat">
           <div className="survival-stat-label">Lives</div>
-          <Lives count={lives} />
+          <Lives count={lives} max={Math.max(MAX_LIVES, lives)} />
         </div>
       </div>
 
@@ -386,10 +429,12 @@ function SurvivalBoard() {
             </div>
           </div>
         </div>
-        <div className="scoring-box">
-          <div className="scoring-label">Scoring Formula</div>
-          <div className="scoring-formula">100 × {fmt(pm)} × {fmt(tm)} × {fmt(ldm)}</div>
-        </div>
+        <ScoringFormula terms={[
+          { value: "100", label: "Base" },
+          { value: fmt(pm), label: "Grid" },
+          { value: fmt(tm), label: "Time" },
+          { value: fmt(ldm), label: "Level" },
+        ]} />
       </div>
 
       <div className="game-buttons">
@@ -433,6 +478,17 @@ function SurvivalBoard() {
         </div>
       </div>
 
+      {started && !gameOver && !pendingStart && canBuyLife && (
+        <div className="buy-life-row">
+          <button className="btn-buy-life" onClick={buyLife}>
+            Buy Life — {lifeCostPct}% of score ({lifeCost.toLocaleString()} pts)
+          </button>
+          {nextLifeCostPct <= 100 && (
+            <div className="buy-life-warning">Next life costs {nextLifeCostPct}%</div>
+          )}
+        </div>
+      )}
+
       {started && !pendingStart && !timerExpired && !levelComplete && (
         <button className="btn-abandon" onClick={handleAbandon}>Abandon Game</button>
       )}
@@ -444,7 +500,17 @@ export default function MemoryGrid() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<"freeplay" | "survival">("freeplay");
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    const saved = localStorage.getItem("gameMode");
+    if (saved === "survival") setMode("survival");
+    setMounted(true);
+  }, []);
+
+  function handleModeChange(next: "freeplay" | "survival") {
+    setMode(next);
+    localStorage.setItem("gameMode", next);
+  }
+
   if (!mounted) return null;
 
   return (
@@ -453,13 +519,13 @@ export default function MemoryGrid() {
         <div className="mode-toggle-track">
           <button
             className={`mode-btn${mode === "freeplay" ? " mode-btn-active" : ""}`}
-            onClick={() => setMode("freeplay")}
+            onClick={() => handleModeChange("freeplay")}
           >
             Freeplay
           </button>
           <button
             className={`mode-btn${mode === "survival" ? " mode-btn-active" : ""}`}
-            onClick={() => setMode("survival")}
+            onClick={() => handleModeChange("survival")}
           >
             Survival
           </button>

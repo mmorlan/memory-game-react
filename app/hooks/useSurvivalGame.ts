@@ -10,7 +10,8 @@ function getStageDurationMs(stage: number): number {
   return pairs * 7_500;
 }
 export const COMPLETIONS_PER_STAGE = 3;
-const MAX_LIVES = 3;
+export const MAX_STAGE = 9;
+export const MAX_LIVES = 3;
 const SAVE_KEY = "survivalGameState";
 
 interface SurvivalSaveState {
@@ -19,8 +20,10 @@ interface SurvivalSaveState {
   completions: number;
   score: number;
   clutchPairs: number;
+  livesPurchased: number;
   started: boolean;
   gameOver: boolean;
+  survived: boolean;
   timerExpired: boolean;
   levelComplete: boolean;
   board: Card[];
@@ -99,11 +102,13 @@ export default function useSurvivalGame() {
   const [started, setStarted] = useState<boolean>(s?.started ?? false);
   const [timerActive, setTimerActive] = useState(false);
   const [gameOver, setGameOver] = useState<boolean>(s?.gameOver ?? false);
+  const [survived, setSurvived] = useState<boolean>(s?.survived ?? false);
   const [timerExpired, setTimerExpired] = useState<boolean>(s?.timerExpired ?? false);
   const [levelComplete, setLevelComplete] = useState<boolean>(s?.levelComplete ?? false);
   const [timerKey, setTimerKey] = useState(0);
   const [score, setScore] = useState<number>(s?.score ?? 0);
   const [clutchPairs, setClutchPairs] = useState<number>(s?.clutchPairs ?? 0);
+  const [livesPurchased, setLivesPurchased] = useState<number>(s?.livesPurchased ?? 0);
   // pendingStart: board is ready but timer hasn't started — waiting for "Start Game" click
   const [pendingStart, setPendingStart] = useState<boolean>(
     !!(s?.started && !s?.gameOver && !s?.levelComplete && !s?.timerExpired)
@@ -128,14 +133,14 @@ export default function useSurvivalGame() {
   useEffect(() => {
     if (!started) return;
     const state: SurvivalSaveState = {
-      stage, lives, completions, score, clutchPairs,
-      started, gameOver, timerExpired, levelComplete,
+      stage, lives, completions, score, clutchPairs, livesPurchased,
+      started, gameOver, survived, timerExpired, levelComplete,
       board,
       totalPairTimeMsMs: totalPairTimeMsRef.current,
       matchedPairCount: matchedPairCountRef.current,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-  }, [stage, lives, completions, score, clutchPairs, started, gameOver, timerExpired, levelComplete, board]);
+  }, [stage, lives, completions, score, clutchPairs, livesPurchased, started, gameOver, survived, timerExpired, levelComplete, board]);
 
   // Board completed — lock score and wait for user to advance
   useEffect(() => {
@@ -197,6 +202,13 @@ export default function useSurvivalGame() {
   function advanceLevel(): void {
     const newCompletions = completions + 1;
     if (newCompletions >= COMPLETIONS_PER_STAGE) {
+      if (stage >= MAX_STAGE) {
+        // Win condition: completed Stage 9 Level 3
+        setSurvived(true);
+        setGameOver(true);
+        setLevelComplete(false);
+        return;
+      }
       const nextStage = stage + 1;
       const { rows: r, cols: c } = getGridForStage(nextStage);
       setStage(nextStage);
@@ -228,6 +240,15 @@ export default function useSurvivalGame() {
     }
   }
 
+  function buyLife(): void {
+    const costFraction = 0.10 + livesPurchased * 0.05;
+    if (costFraction > 1.0) return;
+    const cost = Math.round(score * costFraction);
+    setScore(prev => Math.max(0, prev - cost));
+    setLives(prev => prev + 1);
+    setLivesPurchased(prev => prev + 1);
+  }
+
   function startGame(): void {
     const { rows: r, cols: c } = getGridForStage(1);
     setStage(1);
@@ -243,6 +264,7 @@ export default function useSurvivalGame() {
     setStarted(true);
     setScore(0);
     setClutchPairs(0);
+    setLivesPurchased(0);
     lastPairTimeRef.current = Date.now();
     totalPairTimeMsRef.current = 0;
     matchedPairCountRef.current = 0;
@@ -254,6 +276,7 @@ export default function useSurvivalGame() {
     setStarted(false);
     setTimerActive(false);
     setGameOver(false);
+    setSurvived(false);
     setTimerExpired(false);
     setLevelComplete(false);
     setPendingStart(false);
@@ -264,6 +287,7 @@ export default function useSurvivalGame() {
     setTimerKey(k => k + 1);
     setScore(0);
     setClutchPairs(0);
+    setLivesPurchased(0);
     lastPairTimeRef.current = Date.now();
     totalPairTimeMsRef.current = 0;
     matchedPairCountRef.current = 0;
@@ -276,9 +300,9 @@ export default function useSurvivalGame() {
 
   return {
     board, rows, cols,
-    stage, lives, completions, score, clutchPairs,
-    started, gameOver, timeLeft, timerExpired, levelComplete, pendingStart,
+    stage, lives, completions, score, clutchPairs, livesPurchased,
+    started, gameOver, survived, timeLeft, timerExpired, levelComplete, pendingStart,
     stageDurationMs, ldm: getLDM(completions),
-    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, getAvgTimeToPairMs,
+    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs,
   };
 }

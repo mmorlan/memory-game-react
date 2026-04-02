@@ -25,7 +25,7 @@ export default function Header() {
               <User size={16} />
               <span>{username}</span>
             </Link>
-            <button className="header-btn header-btn-signout" onClick={handleSignOut}>
+            <button className="header-btn header-btn-signout" onClick={async () => { await handleSignOut(); window.location.href = '/'; }}>
               <LogOut size={16} />
               <span>Sign Out</span>
             </button>

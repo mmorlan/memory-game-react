@@ -35,6 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function handleSignOut(): Promise<void> {
+    localStorage.removeItem('survivalGameState');
+    localStorage.removeItem('gameMode');
     await signOut();
     setUser(null);
     setUsername(null);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Trophy } from "lucide-react";
+import { Trophy, Monitor, Smartphone } from "lucide-react";
 import { ChevronDown } from "../components/icons";
 import { LeaderboardEntry } from "../util/dynamodb";
 import { formatTime } from "../util/scoring";
@@ -51,56 +51,75 @@ function GridFilter({ value, onChange }: { value: number | null; onChange: (n: n
   );
 }
 
-function load<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const v = localStorage.getItem(key);
-    return v !== null ? JSON.parse(v) as T : fallback;
-  } catch { return fallback; }
-}
+type DeviceFilter = "all" | "desktop" | "mobile";
+type AllEntries = { freeplay: LeaderboardEntry[]; survival: LeaderboardEntry[] };
 
-const cache: Partial<Record<Mode, LeaderboardEntry[]>> = {};
+const DEVICE_OPTIONS: { value: DeviceFilter; label: string; icon: React.ReactNode }[] = [
+  { value: "all",     label: "All",     icon: null },
+  { value: "desktop", label: "Desktop", icon: <Monitor size={14} /> },
+  { value: "mobile",  label: "Mobile",  icon: <Smartphone size={14} /> },
+];
 
 export default function LeaderboardPage() {
   const [mode, setMode] = useState<Mode>("freeplay");
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [deviceFilter, setDeviceFilter] = useState<DeviceFilter>("all");
+  const [data, setData] = useState<AllEntries | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterRows, setFilterRows] = useState<number | null>(null);
   const [filterCols, setFilterCols] = useState<number | null>(null);
 
-  // Restore persisted state after mount to avoid SSR hydration mismatch
+  // Restore persisted UI state after mount to avoid SSR hydration mismatch
   useEffect(() => {
-    setMode(load("lb_mode", "freeplay" as Mode));
-    setFilterRows(load("lb_filterRows", null));
-    setFilterCols(load("lb_filterCols", null));
-  }, []);
+    const savedMode = localStorage.getItem("lb_mode");
+    if (savedMode === "freeplay" || savedMode === "survival") setMode(savedMode);
+    const savedDevice = localStorage.getItem("lb_device");
+    if (savedDevice === "all" || savedDevice === "desktop" || savedDevice === "mobile") setDeviceFilter(savedDevice);
+    try {
+      const r = localStorage.getItem("lb_filterRows");
+      const c = localStorage.getItem("lb_filterCols");
+      if (r) setFilterRows(JSON.parse(r));
+      if (c) setFilterCols(JSON.parse(c));
+    } catch { /* ignore */ }
 
-  useEffect(() => { localStorage.setItem("lb_mode", JSON.stringify(mode)); }, [mode]);
-  useEffect(() => { localStorage.setItem("lb_filterRows", JSON.stringify(filterRows)); }, [filterRows]);
-  useEffect(() => { localStorage.setItem("lb_filterCols", JSON.stringify(filterCols)); }, [filterCols]);
-
-  useEffect(() => {
-    if (cache[mode]) {
-      setEntries(cache[mode]!);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    fetch(`/api/leaderboard?mode=${mode}`)
+    fetch("/api/leaderboard")
       .then(res => res.json())
-      .then(data => {
-        if (data.error) throw new Error(data.error);
-        cache[mode] = data as LeaderboardEntry[];
-        setEntries(cache[mode]!);
+      .then((json: AllEntries & { error?: string }) => {
+        if (json.error) throw new Error(json.error);
+        setData(json);
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [mode]);
+  }, []);
 
+  function handleModeChange(m: Mode) {
+    setMode(m);
+    localStorage.setItem("lb_mode", m);
+  }
+
+  function handleDeviceFilter(d: DeviceFilter) {
+    setDeviceFilter(d);
+    localStorage.setItem("lb_device", d);
+  }
+
+  function handleFilterRows(n: number | null) {
+    setFilterRows(n);
+    localStorage.setItem("lb_filterRows", JSON.stringify(n));
+  }
+
+  function handleFilterCols(n: number | null) {
+    setFilterCols(n);
+    localStorage.setItem("lb_filterCols", JSON.stringify(n));
+  }
+
+  const entries = data?.[mode] ?? [];
   const filtered = entries
-    .filter(e => e.score > 0 && (filterRows === null || e.rows === filterRows) && (filterCols === null || e.cols === filterCols))
+    .filter(e =>
+      e.score > 0 &&
+      (deviceFilter === "all" || e.device === deviceFilter) &&
+      (filterRows === null || e.rows === filterRows) &&
+      (filterCols === null || e.cols === filterCols)
+    )
     .slice(0, 10);
 
   return (
@@ -115,9 +134,21 @@ export default function LeaderboardPage() {
           <button
             key={m}
             className={`${classes["tab-btn"]}${mode === m ? ` ${classes["tab-btn-active"]}` : ""}`}
-            onClick={() => setMode(m)}
+            onClick={() => handleModeChange(m)}
           >
             {m.charAt(0).toUpperCase() + m.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div className={classes["tab-toggle"]}>
+        {DEVICE_OPTIONS.map(({ value, label, icon }) => (
+          <button
+            key={value}
+            className={`${classes["tab-btn"]}${deviceFilter === value ? ` ${classes["tab-btn-active"]}` : ""}`}
+            onClick={() => handleDeviceFilter(value)}
+          >
+            {icon}{label}
           </button>
         ))}
       </div>
@@ -125,9 +156,9 @@ export default function LeaderboardPage() {
       {mode === "freeplay" && (
         <div className={classes["grid-controls"]}>
           <span className={classes["grid-controls-label"]}>Grid Size:</span>
-          <GridFilter value={filterRows} onChange={setFilterRows} />
+          <GridFilter value={filterRows} onChange={handleFilterRows} />
           <span className={classes["grid-controls-times"]}>×</span>
-          <GridFilter value={filterCols} onChange={setFilterCols} />
+          <GridFilter value={filterCols} onChange={handleFilterCols} />
         </div>
       )}
 
@@ -151,7 +182,10 @@ export default function LeaderboardPage() {
             {filtered.map((e, i) => (
               <div key={e.gameId} className={`${classes.row}${i < 3 ? ` ${classes[`rank-${i + 1}`]}` : ""}`}>
                 <span className={classes.rank}>{i + 1}</span>
-                <span className={classes.player}>{e.username ?? "Anonymous"}</span>
+                <span className={classes.player}>
+                  {e.device === "mobile" ? <Smartphone size={12} color="#6b7280" /> : <Monitor size={12} color="#6b7280" />}
+                  {e.username ?? "Anonymous"}
+                </span>
                 <span className={classes.score}>{e.score.toLocaleString()}</span>
                 {mode === "freeplay"
                   ? <span>{e.rows}×{e.cols}</span>
