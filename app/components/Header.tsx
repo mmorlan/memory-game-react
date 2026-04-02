@@ -12,7 +12,7 @@ export default function Header() {
 
   return (
     <header className="header">
-      <div className="header-logo">Memory Game</div>
+      <Link className="header-logo" href="/">Paranoia</Link>
       <nav className="header-nav">
         {isLoading ? (
           <>

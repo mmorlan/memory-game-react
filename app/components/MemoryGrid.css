@@ -337,6 +337,22 @@
   background: #00cc30;
 }
 
+.btn-abandon {
+  background: transparent;
+  border: 1px solid #4b5563;
+  border-radius: 0.5rem;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+}
+
+.btn-abandon:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
 .btn-danger {
   background: #ef4444;
   border: 1px solid transparent;

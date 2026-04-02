@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
       KeyConditionExpression: "leaderboardkey = :key",
       ExpressionAttributeValues: { ":key": mode },
       ScanIndexForward: false,
-      Limit: 10,
+      Limit: 100,
     }));
 
     const entries = result.Items ?? [];

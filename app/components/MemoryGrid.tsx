@@ -180,6 +180,27 @@ function FreeplayBoard() {
     setPendingCols(cols);
   }
 
+  function handleAbandon() {
+    if (started && user && !savedRef.current) {
+      savedRef.current = true;
+      const pairs = Math.floor((rows * cols) / 2);
+      const now = new Date().toISOString();
+      saveGame(user.userId, {
+        gameId: now,
+        mode: "freeplay",
+        score,
+        timeMs: elapsed,
+        rows,
+        cols,
+        pairs,
+        completedAt: now,
+        leaderboardkey: "freeplay",
+        avgTimeToPairMs: getAvgTimeToPairMs(),
+      }).catch(console.error);
+    }
+    handleNewGame();
+  }
+
   if (allMatched && started) {
     return (
       <>
@@ -219,7 +240,6 @@ function FreeplayBoard() {
             Start Game
           </button>
         )}
-        {started && <button onClick={handleNewGame}>New Game</button>}
       </div>
 
       <GameGrid
@@ -242,6 +262,10 @@ function FreeplayBoard() {
           <div className="stat-value stat-value-accent">{score.toLocaleString()}</div>
         </div>
       </div>
+
+      {started && !allMatched && (
+        <button className="btn-abandon" onClick={handleAbandon}>Abandon Game</button>
+      )}
     </>
   );
 }
@@ -273,6 +297,31 @@ function SurvivalBoard() {
     }
   }, [started]);
 
+  function handleAbandon() {
+    if (started && user && !savedRef.current) {
+      savedRef.current = true;
+      const pairs = Math.floor((rows * cols) / 2);
+      const now = new Date().toISOString();
+      saveGame(user.userId, {
+        gameId: now,
+        mode: "survival",
+        score,
+        timeMs: Date.now() - startedAtRef.current,
+        rows,
+        cols,
+        pairs,
+        stage,
+        completedAt: now,
+        leaderboardkey: "survival",
+        avgTimeToPairMs: getAvgTimeToPairMs(),
+        clutchPairs,
+        survived: false,
+        remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
+      }).catch(console.error);
+    }
+    resetGame();
+  }
+
   // Save completed survival run to DynamoDB
   useEffect(() => {
     if (!gameOver || !user || savedRef.current) return;
@@ -293,6 +342,7 @@ function SurvivalBoard() {
       avgTimeToPairMs: getAvgTimeToPairMs(),
       clutchPairs,
       survived: false,
+      remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
     }).catch(console.error);
   }, [gameOver, user, rows, cols, score, stage]);
 
@@ -348,9 +398,6 @@ function SurvivalBoard() {
             Start Game
           </button>
         )}
-        {started && !pendingStart && !timerExpired && !levelComplete && (
-          <button onClick={resetGame}>New Game</button>
-        )}
         {levelComplete && (
           <button className="btn-start" onClick={advanceLevel}>
             {completions + 1 >= COMPLETIONS_PER_STAGE ? "Next Stage →" : "Next Level →"}
@@ -385,6 +432,10 @@ function SurvivalBoard() {
           <div className="stat-value stat-value-accent">{score.toLocaleString()}</div>
         </div>
       </div>
+
+      {started && !pendingStart && !timerExpired && !levelComplete && (
+        <button className="btn-abandon" onClick={handleAbandon}>Abandon Game</button>
+      )}
     </>
   );
 }
