@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import useLocalStorage from "./useLocalStorage";
 import useStopwatch from "./useStopwatch";
 import { ICON_NAMES } from "../components/icons";
@@ -51,14 +51,19 @@ export default function useMemoryGame() {
   const [board, setBoard] = useLocalStorage<Card[]>("mg-board", createShuffledBoard(4, 4));
   const [startTime, setStartTime] = useLocalStorage<number>("mg-start", Date.now());
   const [endTime, setEndTime] = useLocalStorage<number | null>("mg-end", null);
-  const [started, setStarted] = useState(false);
-  const [score, setScore] = useState(0);
+  const [started, setStarted] = useLocalStorage<boolean>("mg-started", false);
+  const [score, setScore] = useLocalStorage<number>("mg-score", 0);
   const lastPairTimeRef = useRef<number>(Date.now());
   const totalPairTimeMsRef = useRef(0);
   const matchedPairCountRef = useRef(0);
 
   const allMatched = board.filter(c => c.iconName !== "__blank__").every(c => c.matched);
   const elapsed = useStopwatch(started && !allMatched, startTime, endTime);
+
+  // On restore: clear any clicked-but-unmatched cards to avoid a stuck 2-card state
+  useEffect(() => {
+    setBoard(prev => prev.map(c => (c.clicked && !c.matched ? { ...c, clicked: false } : c)));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (allMatched && started && !endTime) {

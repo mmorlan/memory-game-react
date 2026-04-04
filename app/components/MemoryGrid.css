@@ -45,7 +45,7 @@
 
 /* Grid Controls */
 .grid-controls {
-  align-items: center;
+  align-items: baseline;
   display: flex;
   font-size: 0.875rem;
   gap: 0.75rem;
@@ -120,6 +120,13 @@
 .grid-select-option-active {
   color: #00ff3c;
   font-weight: 700;
+}
+
+.grid-select-labeled {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .grid-controls-times {
@@ -223,6 +230,7 @@
 .memory-grid {
   display: grid;
   gap: 0.75rem;
+  grid-template-columns: repeat(var(--cols, 4), 1fr);
 }
 
 .memory-card {
@@ -338,9 +346,12 @@
   transform: none;
 }
 
-/* Blank card */
+/* Blank card — background-clip: content-box keeps the green fill
+   the same visual size as the dark interior of adjacent cards */
 .blank-card {
   background: #00ff3c;
+  background-clip: content-box;
+  border-color: transparent;
   cursor: default;
   pointer-events: none;
 }
@@ -527,4 +538,32 @@
   color: #84cc16;
   font-size: 1.25rem;
   font-weight: 600;
+}
+
+/* Mobile grid layout */
+@media (width <= 640px) {
+  .grid-container {
+    box-sizing: border-box;
+    padding: 0.25rem;
+    width: 100%;
+  }
+
+  .memory-grid {
+    gap: 0.5rem;
+    grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr));
+    width: 100%;
+  }
+
+  /* border-box keeps each card exactly at its grid cell size */
+  .memory-card {
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  /* border-box prevents card faces from overflowing their container,
+     which caused a 2px shift during the flip animation */
+  .card-cover,
+  .card-face {
+    box-sizing: border-box;
+  }
 }

@@ -29,6 +29,7 @@ interface SurvivalSaveState {
   board: Card[];
   totalPairTimeMsMs: number;
   matchedPairCount: number;
+  timerEndTimestamp: number | null;
 }
 
 function loadSaveState(): SurvivalSaveState | null {
@@ -73,7 +74,25 @@ function selectSimilarIcons(count: number): string[] {
   return result;
 }
 
+const MOBILE_GRIDS: Record<number, { rows: number; cols: number }> = {
+  1: { rows:  4, cols: 4 }, //  8 pairs
+  2: { rows:  5, cols: 5 }, // 12 pairs
+  3: { rows:  6, cols: 6 }, // 18 pairs
+  4: { rows:  7, cols: 7 }, // 24 pairs
+  5: { rows:  8, cols: 8 }, // 32 pairs
+  6: { rows: 10, cols: 8 }, // 40 pairs
+  7: { rows: 13, cols: 8 }, // 52 pairs (~50)
+  8: { rows: 15, cols: 8 }, // 60 pairs
+  9: { rows: 18, cols: 8 }, // 72 pairs
+};
+
+function isMobileDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
 function getGridForStage(stage: number) {
+  if (isMobileDevice()) return MOBILE_GRIDS[stage] ?? { rows: 6, cols: 6 };
   const size = Math.min(stage + 3, 12);
   return { rows: size, cols: size };
 }
@@ -92,31 +111,42 @@ export default function useSurvivalGame() {
   }
   const s = savedRef.current;
 
+  // Compute timer restore values before any useState calls
+  const savedTimerEnd = s?.timerEndTimestamp ?? null;
+  const now = Date.now();
+  const restoredTimeLeft = savedTimerEnd !== null ? Math.max(0, savedTimerEnd - now) : null;
+  const timerWasRunning = restoredTimeLeft !== null && restoredTimeLeft > 0;
+  const timerExpiredWhileAway = savedTimerEnd !== null && !timerWasRunning;
+
   const [stage, setStage] = useState<number>(s?.stage ?? 1);
   const [lives, setLives] = useState<number>(s?.lives ?? MAX_LIVES);
   const [completions, setCompletions] = useState<number>(s?.completions ?? 0);
   const [board, setBoard] = useState<Card[]>(() => {
-    if (s?.board?.length) return s.board;
+    if (s?.board?.length) return s.board.map(c => c.clicked && !c.matched ? { ...c, clicked: false } : c);
     return createShuffledBoard(4, 4);
   });
   const [started, setStarted] = useState<boolean>(s?.started ?? false);
-  const [timerActive, setTimerActive] = useState(false);
+  const [timerActive, setTimerActive] = useState(timerWasRunning);
   const [gameOver, setGameOver] = useState<boolean>(s?.gameOver ?? false);
   const [survived, setSurvived] = useState<boolean>(s?.survived ?? false);
-  const [timerExpired, setTimerExpired] = useState<boolean>(s?.timerExpired ?? false);
+  const [timerExpired, setTimerExpired] = useState<boolean>(
+    (s?.timerExpired ?? false) || timerExpiredWhileAway
+  );
   const [levelComplete, setLevelComplete] = useState<boolean>(s?.levelComplete ?? false);
   const [timerKey, setTimerKey] = useState(0);
   const [score, setScore] = useState<number>(s?.score ?? 0);
   const [clutchPairs, setClutchPairs] = useState<number>(s?.clutchPairs ?? 0);
   const [livesPurchased, setLivesPurchased] = useState<number>(s?.livesPurchased ?? 0);
-  // pendingStart: board is ready but timer hasn't started — waiting for "Start Game" click
+  // pendingStart: timer not running, board ready, waiting for "Start Game" click
   const [pendingStart, setPendingStart] = useState<boolean>(
-    !!(s?.started && !s?.gameOver && !s?.levelComplete && !s?.timerExpired)
+    !!(s?.started && !s?.gameOver && !s?.levelComplete && !s?.timerExpired && !timerExpiredWhileAway && !timerWasRunning)
   );
 
   const lastPairTimeRef = useRef<number>(Date.now());
   const totalPairTimeMsRef = useRef<number>(s?.totalPairTimeMsMs ?? 0);
   const matchedPairCountRef = useRef<number>(s?.matchedPairCount ?? 0);
+  // Tracks when the current timer period will expire (absolute timestamp)
+  const timerEndTimestampRef = useRef<number | null>(timerWasRunning ? savedTimerEnd : null);
 
   const { rows, cols } = getGridForStage(stage);
   const allMatched = board.filter(c => c.iconName !== "__blank__").every(c => c.matched);
@@ -127,6 +157,7 @@ export default function useSurvivalGame() {
     started && timerActive && !allMatched && !gameOver,
     stageDurationMs,
     timerKey,
+    restoredTimeLeft ?? undefined,
   );
 
   // Persist state to localStorage whenever key values change
@@ -138,15 +169,17 @@ export default function useSurvivalGame() {
       board,
       totalPairTimeMsMs: totalPairTimeMsRef.current,
       matchedPairCount: matchedPairCountRef.current,
+      timerEndTimestamp: timerEndTimestampRef.current,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-  }, [stage, lives, completions, score, clutchPairs, livesPurchased, started, gameOver, survived, timerExpired, levelComplete, board]);
+  }, [stage, lives, completions, score, clutchPairs, livesPurchased, started, gameOver, survived, timerExpired, levelComplete, board, timerActive]);
 
   // Board completed — lock score and wait for user to advance
   useEffect(() => {
     if (!started || gameOver || !allMatched || levelComplete) return;
     setLevelComplete(true);
     setTimerActive(false);
+    timerEndTimestampRef.current = null;
   }, [allMatched, started, gameOver, levelComplete]);
 
   // Timer expired — reveal all cards and wait for user action
@@ -154,6 +187,7 @@ export default function useSurvivalGame() {
     if (!started || !timerActive || gameOver || allMatched || timeLeft > 0) return;
     setTimerExpired(true);
     setTimerActive(false);
+    timerEndTimestampRef.current = null;
   }, [timeLeft, started, timerActive, gameOver, allMatched]);
 
   function handleCardClick(cardId: number): void {
@@ -196,6 +230,7 @@ export default function useSurvivalGame() {
     setPendingStart(false);
     setTimerActive(true);
     lastPairTimeRef.current = Date.now();
+    timerEndTimestampRef.current = Date.now() + stageDurationMs;
   }
 
   // Advance to next level or stage — sets up board and waits for Start click
@@ -203,7 +238,6 @@ export default function useSurvivalGame() {
     const newCompletions = completions + 1;
     if (newCompletions >= COMPLETIONS_PER_STAGE) {
       if (stage >= MAX_STAGE) {
-        // Win condition: completed Stage 9 Level 3
         setSurvived(true);
         setGameOver(true);
         setLevelComplete(false);
@@ -222,6 +256,7 @@ export default function useSurvivalGame() {
     setLevelComplete(false);
     setTimerKey(k => k + 1);
     setPendingStart(true);
+    timerEndTimestampRef.current = null;
   }
 
   // User acknowledges timer expiry — costs a life, then waits for Start click
@@ -237,6 +272,7 @@ export default function useSurvivalGame() {
       setTimerExpired(false);
       setTimerKey(k => k + 1);
       setPendingStart(true);
+      timerEndTimestampRef.current = null;
     }
   }
 
@@ -268,6 +304,7 @@ export default function useSurvivalGame() {
     lastPairTimeRef.current = Date.now();
     totalPairTimeMsRef.current = 0;
     matchedPairCountRef.current = 0;
+    timerEndTimestampRef.current = Date.now() + getStageDurationMs(1);
   }
 
   function resetGame(): void {
@@ -291,6 +328,7 @@ export default function useSurvivalGame() {
     lastPairTimeRef.current = Date.now();
     totalPairTimeMsRef.current = 0;
     matchedPairCountRef.current = 0;
+    timerEndTimestampRef.current = null;
   }
 
   function getAvgTimeToPairMs(): number {

@@ -1,14 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export default function useCountdown(
   isRunning: boolean,
   durationMs: number,
   resetKey: number,
+  initialTimeMs?: number,
 ): number {
-  const [timeLeft, setTimeLeft] = useState(durationMs);
+  const [timeLeft, setTimeLeft] = useState(initialTimeMs ?? durationMs);
+  const mounted = useRef(false);
 
-  // Reset to full duration whenever resetKey changes
+  // Skip the effect on initial mount so initialTimeMs is preserved;
+  // subsequent resetKey changes (new level) reset to full durationMs.
   useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
     setTimeLeft(durationMs);
   }, [resetKey, durationMs]);
 

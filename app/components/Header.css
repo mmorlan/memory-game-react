@@ -12,6 +12,7 @@
   color: #fff;
   font-size: 1.125rem;
   font-weight: 700;
+  padding-left: 1rem;
 }
 
 .header-nav {
@@ -55,6 +56,68 @@
 .header-btn-signout:hover {
   background: #2d1f1f;
   color: #fca5a5;
+}
+
+/* Auth dropdown (mobile) */
+.header-auth-dropdown-wrapper {
+  position: relative;
+}
+
+.header-auth-dropdown {
+  background: #1f2937;
+  border: 1px solid #374151;
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 5rem;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  z-index: 50;
+}
+
+.header-auth-dropdown-item {
+  color: #d1d5db;
+  font-size: 0.875rem;
+  padding: 0.625rem 1rem;
+  text-decoration: none;
+}
+
+.header-auth-dropdown-item:hover {
+  background: #374151;
+  color: #fff;
+}
+
+.header-auth-dropdown-item-primary {
+  color: #84cc16;
+  font-weight: 700;
+}
+
+/* Mobile: icon-only header */
+@media (width <= 640px) {
+  .header-btn-text {
+    display: none;
+  }
+
+  .header-auth-desktop {
+    display: none;
+  }
+
+  .header-auth-mobile {
+    display: flex;
+  }
+}
+
+@media (width >= 641px) {
+  .header-auth-mobile {
+    display: none;
+  }
+
+  .header-auth-desktop {
+    display: flex;
+    gap: 0.5rem;
+  }
 }
 
 @keyframes skeleton-pulse {

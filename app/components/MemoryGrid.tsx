@@ -14,6 +14,8 @@ import { saveGame } from "../util/dynamodb";
 import { formatTime, getTimeMultiplier } from "../util/scoring";
 
 const GRID_OPTIONS = Array.from({ length: 9 }, (_, i) => i + 4);
+const MOBILE_ROW_OPTIONS = Array.from({ length: 15 }, (_, i) => i + 4);
+const MOBILE_COL_OPTIONS = Array.from({ length: 5 }, (_, i) => i + 4);
 
 function getDevice(): "desktop" | "mobile" {
   return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
@@ -39,7 +41,7 @@ function ScoringFormula({ terms }: { terms: { value: string; label: string }[] }
   );
 }
 
-function GridSelect({ value, onChange }: { value: number; onChange: (n: number) => void }) {
+function GridSelect({ value, onChange, options = GRID_OPTIONS }: { value: number; onChange: (n: number) => void; options?: number[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -58,7 +60,7 @@ function GridSelect({ value, onChange }: { value: number; onChange: (n: number) 
       <ChevronDown size={14} color="#9ca3af" className={open ? "chevron-open" : ""} />
       {open && (
         <div className="grid-select-dropdown">
-          {GRID_OPTIONS.map((n) => (
+          {options.map((n) => (
             <div
               key={n}
               className={`grid-select-option${n === value ? " grid-select-option-active" : ""}`}
@@ -96,7 +98,7 @@ function GameGrid({
     <div className="grid-container">
       <div
         className="memory-grid"
-        style={{ gridTemplateColumns: `repeat(${started ? cols : pendingCols}, 1fr)` }}
+        style={{ "--cols": started ? cols : pendingCols } as React.CSSProperties}
       >
         {!started
           ? Array.from({ length: pendingRows * pendingCols }, (_, i) => {
@@ -160,6 +162,9 @@ function FreeplayBoard() {
   const { user } = useAuth();
   const { cardsHidden } = useGameSettings();
   const { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs } = useMemoryGame();
+  const isMobile = getDevice() === "mobile";
+  const rowOptions = isMobile ? MOBILE_ROW_OPTIONS : GRID_OPTIONS;
+  const colOptions = isMobile ? MOBILE_COL_OPTIONS : GRID_OPTIONS;
   const [pendingRows, setPendingRows] = useState(rows);
   const [pendingCols, setPendingCols] = useState(cols);
   const savedRef = useRef(false);
@@ -241,11 +246,17 @@ function FreeplayBoard() {
       <div className={`grid-controls${started ? " grid-controls-disabled" : ""}`}>
         <span className="grid-controls-label">Grid Size:</span>
         <div className="grid-controls-selectors">
-          <GridSelect value={pendingRows} onChange={setPendingRows} />
+          <div className="grid-select-labeled">
+            <GridSelect value={pendingRows} onChange={setPendingRows} options={rowOptions} />
+            {isMobile && <span className="grid-controls-hint">rows 4–18</span>}
+          </div>
           <span className="grid-controls-times">×</span>
-          <GridSelect value={pendingCols} onChange={setPendingCols} />
+          <div className="grid-select-labeled">
+            <GridSelect value={pendingCols} onChange={setPendingCols} options={colOptions} />
+            {isMobile && <span className="grid-controls-hint">cols 4–8</span>}
+          </div>
         </div>
-        <span className="grid-controls-hint">(4–12 each)</span>
+        {!isMobile && <span className="grid-controls-hint">(4–12 each)</span>}
       </div>
 
       <div className="timer-row">
@@ -406,7 +417,7 @@ function SurvivalBoard() {
     <>
       <div className="survival-info">
         <div className="survival-stat">
-          <div className="survival-stat-label">Current Stage</div>
+          <div className="survival-stat-label">Stage</div>
           <div className="survival-stat-stage">{stage}</div>
         </div>
         <div className="survival-stat">
