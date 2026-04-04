@@ -85,10 +85,12 @@ export default function Header() {
           </>
         )}
 
-        <button className="header-btn" onClick={toggleCardsHidden} title={cardsHidden ? "Cards hidden" : "Cards visible"}>
-          {cardsHidden ? <EyeOff size={16} /> : <Eye size={16} />}
-          <span className="header-btn-text">{cardsHidden ? "Hidden" : "Visible"}</span>
-        </button>
+        {process.env.NODE_ENV === 'development' && (
+          <button className="header-btn" onClick={toggleCardsHidden} title={cardsHidden ? "Cards hidden" : "Cards visible"}>
+            {cardsHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+            <span className="header-btn-text">{cardsHidden ? "Hidden" : "Visible"}</span>
+          </button>
+        )}
         <Link href="/leaderboard" className="header-btn">
           <Trophy size={16} color="#84cc16" />
           <span className="header-btn-text">Leaderboard</span>
