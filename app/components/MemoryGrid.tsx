@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Heart, Clock } from "lucide-react";
 import "./MemoryGrid.css";
 import { ChevronDown } from "./icons";
@@ -12,6 +13,28 @@ import useAuth from "../hooks/useAuth";
 import useGameSettings from "../hooks/useGameSettings";
 import { saveGame } from "../util/dynamodb";
 import { formatTime, getTimeMultiplier } from "../util/scoring";
+
+function SaveScoreModal({ score, onSkip }: { score: number; onSkip: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="modal-overlay">
+      <div className="save-score-modal">
+        <div className="modal-title">Save Your Score</div>
+        <div className="modal-score">{score.toLocaleString()}</div>
+        <p className="modal-body">
+          Create a free account to save your score and compete on the leaderboard.
+        </p>
+        <button className="btn-start modal-btn-full" onClick={() => router.push('/register')}>
+          Create Account
+        </button>
+        <button className="modal-btn-secondary" onClick={() => router.push('/sign-in')}>
+          Sign In
+        </button>
+        <button className="modal-skip" onClick={onSkip}>No thanks</button>
+      </div>
+    </div>
+  );
+}
 
 const GRID_OPTIONS = Array.from({ length: 9 }, (_, i) => i + 4);
 const MOBILE_ROW_OPTIONS = Array.from({ length: 15 }, (_, i) => i + 4);
@@ -168,6 +191,7 @@ function FreeplayBoard() {
   const [pendingRows, setPendingRows] = useState(rows);
   const [pendingCols, setPendingCols] = useState(cols);
   const savedRef = useRef(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   useEffect(() => {
     setPendingRows(rows);
@@ -179,7 +203,7 @@ function FreeplayBoard() {
     if (started) savedRef.current = false;
   }, [started]);
 
-  // Save completed game to DynamoDB
+  // Save completed game to DynamoDB (authenticated)
   useEffect(() => {
     if (!allMatched || !started || !user || savedRef.current) return;
     savedRef.current = true;
@@ -198,6 +222,28 @@ function FreeplayBoard() {
       device: getDevice(),
       avgTimeToPairMs: getAvgTimeToPairMs(),
     }).catch(console.error);
+  }, [allMatched, started, user, rows, cols, score, elapsed]);
+
+  // Prompt unauthenticated user to save their score
+  useEffect(() => {
+    if (!allMatched || !started || user || savedRef.current) return;
+    savedRef.current = true;
+    const now = new Date().toISOString();
+    const pairs = Math.floor((rows * cols) / 2);
+    localStorage.setItem('pendingGame', JSON.stringify({
+      gameId: now,
+      mode: "freeplay",
+      score,
+      timeMs: elapsed,
+      rows,
+      cols,
+      pairs,
+      completedAt: now,
+      leaderboardkey: "freeplay",
+      device: getDevice(),
+      avgTimeToPairMs: getAvgTimeToPairMs(),
+    }));
+    setShowSaveModal(true);
   }, [allMatched, started, user, rows, cols, score, elapsed]);
 
   const showStartGame = !started || pendingRows !== rows || pendingCols !== cols;
@@ -237,6 +283,7 @@ function FreeplayBoard() {
         <div className="win-message">You won in {formatTime(elapsed)}!</div>
         <div className="win-score">Score: {score.toLocaleString()}</div>
         <button onClick={handleNewGame}>Play Again</button>
+        {showSaveModal && <SaveScoreModal score={score} onSkip={() => setShowSaveModal(false)} />}
       </>
     );
   }
@@ -333,6 +380,7 @@ function SurvivalBoard() {
 
   const startedAtRef = useRef<number>(0);
   const savedRef = useRef(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
 
   useEffect(() => {
     if (started) {
@@ -366,6 +414,28 @@ function SurvivalBoard() {
     resetGame();
   }
 
+  // Prompt unauthenticated user to save their score
+  useEffect(() => {
+    if (!gameOver || user) return;
+    const now = new Date().toISOString();
+    const pairs = Math.floor((rows * cols) / 2);
+    localStorage.setItem('pendingGame', JSON.stringify({
+      gameId: now,
+      mode: "survival",
+      score,
+      timeMs: Date.now() - startedAtRef.current,
+      rows, cols, pairs, stage,
+      completedAt: now,
+      leaderboardkey: "survival",
+      device: getDevice(),
+      avgTimeToPairMs: getAvgTimeToPairMs(),
+      clutchPairs,
+      survived,
+      remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
+    }));
+    setShowSaveModal(true);
+  }, [gameOver, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Save completed survival run to DynamoDB
   useEffect(() => {
     if (!gameOver || !user || savedRef.current) return;
@@ -398,6 +468,7 @@ function SurvivalBoard() {
         <div className="game-over-info">You cleared all 9 stages</div>
         <div className="game-over-info">Final Score: {score.toLocaleString()}</div>
         <button className="btn-start" onClick={resetGame}>Play Again</button>
+        {showSaveModal && <SaveScoreModal score={score} onSkip={() => setShowSaveModal(false)} />}
       </div>
     );
   }
@@ -409,6 +480,7 @@ function SurvivalBoard() {
         <div className="game-over-info">You reached Stage {stage}</div>
         <div className="game-over-info">Final Score: {score.toLocaleString()}</div>
         <button className="btn-start" onClick={resetGame}>Play Again</button>
+        {showSaveModal && <SaveScoreModal score={score} onSkip={() => setShowSaveModal(false)} />}
       </div>
     );
   }
