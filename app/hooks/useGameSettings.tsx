@@ -8,12 +8,12 @@ interface GameSettingsContextValue {
 }
 
 const GameSettingsContext = createContext<GameSettingsContextValue>({
-  cardsHidden: false,
+  cardsHidden: true,
   toggleCardsHidden: () => {},
 });
 
 export function GameSettingsProvider({ children }: { children: ReactNode }) {
-  const [cardsHidden, setCardsHidden] = useState(false);
+  const [cardsHidden, setCardsHidden] = useState(true);
   return (
     <GameSettingsContext.Provider value={{ cardsHidden, toggleCardsHidden: () => setCardsHidden(h => !h) }}>
       {children}
