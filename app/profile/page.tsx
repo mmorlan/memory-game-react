@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchUserAttributes } from 'aws-amplify/auth';
 import { User, Upload } from 'lucide-react';
+import filter from 'leo-profanity';
 import useAuth from '../hooks/useAuth';
 import { getUser, updateUser, getUserGames, GameRecord } from '../util/dynamodb';
 import { formatTime } from '../util/scoring';
@@ -119,8 +120,21 @@ export default function ProfilePage() {
     getUserGames(user.userId).then(setGames).catch(() => {}).finally(() => setGamesLoading(false));
   }, [user]);
 
+  function handleBioChange(value: string) {
+    setBio(value);
+    if (filter.check(value)) {
+      setBioError('Bio contains inappropriate language.');
+    } else {
+      setBioError('');
+    }
+  }
+
   async function handleSaveBio() {
     if (!user) return;
+    if (filter.check(bio)) {
+      setBioError('Bio contains inappropriate language.');
+      return;
+    }
     setBioError('');
     setSaveStatus('idle');
     setIsSaving(true);
@@ -211,14 +225,14 @@ export default function ProfilePage() {
               <>
                 <textarea
                   value={bio}
-                  onChange={e => setBio(e.target.value)}
+                  onChange={e => handleBioChange(e.target.value)}
                   className={classes['bio-input']}
                   placeholder="Add a bio about yourself..."
                   autoFocus
                 />
                 {saveStatus === 'error' && <p className={classes.error}>{bioError}</p>}
                 <div className={classes['bio-actions']}>
-                  <button className={classes['save-btn']} onClick={handleSaveBio} disabled={isSaving}>
+                  <button className={classes['save-btn']} onClick={handleSaveBio} disabled={isSaving || !!bioError}>
                     {isSaving ? 'Saving...' : 'Save'}
                   </button>
                   <button className={classes['cancel-link']} onClick={() => setIsEditingBio(false)}>Cancel</button>

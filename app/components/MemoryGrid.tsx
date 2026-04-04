@@ -259,16 +259,18 @@ function FreeplayBoard() {
         {!isMobile && <span className="grid-controls-hint">(4–12 each)</span>}
       </div>
 
-      <div className="timer-row">
-        <div className="timer-box">
-          <Clock size={18} color="#84cc16" />
-          <div className="timer-value">{started ? formatTime(elapsed) : "0:00"}</div>
+      <div className="sticky-bar">
+        <div className="timer-row">
+          <div className="timer-box">
+            <Clock size={18} color="#84cc16" />
+            <div className="timer-value">{started ? formatTime(elapsed) : "0:00"}</div>
+          </div>
+          <ScoringFormula terms={[
+            { value: "100", label: "Base" },
+            { value: fmt(Math.floor((started ? rows * cols : pendingRows * pendingCols) / 2) / 8), label: "Grid" },
+            { value: fmt(getTimeMultiplier(elapsed)), label: "Time" },
+          ]} />
         </div>
-        <ScoringFormula terms={[
-          { value: "100", label: "Base" },
-          { value: fmt(Math.floor((started ? rows * cols : pendingRows * pendingCols) / 2) / 8), label: "Grid" },
-          { value: fmt(getTimeMultiplier(elapsed)), label: "Time" },
-        ]} />
       </div>
 
       <div className="game-buttons">
@@ -415,37 +417,38 @@ function SurvivalBoard() {
 
   return (
     <>
-      <div className="survival-info">
-        <div className="survival-stat">
-          <div className="survival-stat-label">Stage</div>
-          <div className="survival-stat-stage">{stage}</div>
-        </div>
-        <div className="survival-stat">
-          <div className="survival-stat-label">Level</div>
-          <div className="survival-stat-stage">{completions + 1}</div>
-        </div>
-        <div className="survival-stat">
-          <div className="survival-stat-label">Lives</div>
-          <Lives count={lives} max={Math.max(MAX_LIVES, lives)} />
-        </div>
-      </div>
-
-      <div className="timer-row">
-        <div className={`timer-box${isLow ? " timer-box-danger" : ""}`}>
-          <Clock size={18} color={isLow ? "#ef4444" : "#84cc16"} />
-          <div>
-            <div className="timer-label">Stage Time</div>
-            <div className={`timer-value${isLow ? " timer-value-danger" : ""}`}>
-              {formatTime(timeLeft)}
-            </div>
+      <div className="sticky-bar">
+        <div className="survival-info">
+          <div className="survival-stat">
+            <div className="survival-stat-label">Stage</div>
+            <div className="survival-stat-stage">{stage}</div>
+          </div>
+          <div className="survival-stat">
+            <div className="survival-stat-label">Level</div>
+            <div className="survival-stat-stage">{completions + 1}</div>
+          </div>
+          <div className="survival-stat">
+            <div className="survival-stat-label">Lives</div>
+            <Lives count={lives} max={Math.max(MAX_LIVES, lives)} />
           </div>
         </div>
-        <ScoringFormula terms={[
-          { value: "100", label: "Base" },
-          { value: fmt(pm), label: "Grid" },
-          { value: fmt(tm), label: "Time" },
-          { value: fmt(ldm), label: "Level" },
-        ]} />
+
+        <div className="timer-row">
+          <div className={`timer-box${isLow ? " timer-box-danger" : ""}`}>
+            <Clock size={18} color={isLow ? "#ef4444" : "#84cc16"} />
+            <div>
+              <div className={`timer-value${isLow ? " timer-value-danger" : ""}`}>
+                {formatTime(timeLeft)}
+              </div>
+            </div>
+          </div>
+          <ScoringFormula terms={[
+            { value: "100", label: "Base" },
+            { value: fmt(pm), label: "Grid" },
+            { value: fmt(tm), label: "Time" },
+            { value: fmt(ldm), label: "Level" },
+          ]} />
+        </div>
       </div>
 
       <div className="game-buttons">

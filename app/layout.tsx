@@ -6,7 +6,7 @@ import { GameSettingsProvider } from "./hooks/useGameSettings";
 import Header from "./components/Header";
 
 export const metadata: Metadata = {
-  title: "Memory Game",
+  title: "Pairanoia",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -542,6 +542,86 @@
 
 /* Mobile grid layout */
 @media (width <= 640px) {
+  :root {
+    --header-h: 3.5rem;
+  }
+
+  /* Sticky bar sits below the sticky header during grid scroll */
+  .sticky-bar {
+    align-items: center;
+    background: #111827;
+    border-bottom: 1px solid #1f2937;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-bottom: 0.625rem;
+    position: sticky;
+    top: var(--header-h);
+    width: 100%;
+    z-index: 90;
+  }
+
+  /* Hide grid size controls once a game is in progress */
+  .grid-controls-disabled {
+    display: none;
+  }
+
+  /* Timer row: side by side, no wrap */
+  .timer-row {
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    padding: 0 0.25rem;
+    width: 100%;
+  }
+
+  /* Compact timer box */
+  .timer-box {
+    flex: 0 0 auto;
+    gap: 0.5rem;
+    padding: 0.875rem 0.75rem;
+
+    svg {
+      height: 20px;
+      width: 20px;
+    }
+  }
+
+  .timer-value {
+    font-size: 1.125rem;
+  }
+
+  .timer-label {
+    font-size: 0.625rem;
+  }
+
+  /* Compact scoring box, sized to content, vertically centers content */
+  .scoring-box {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    justify-content: center;
+    padding: 0.5rem 0.25rem;
+  }
+
+  .scoring-label {
+    font-size: 0.625rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .scoring-value {
+    font-size: 1rem;
+  }
+
+  .scoring-term-label {
+    font-size: 0.5rem;
+  }
+
+  .scoring-op {
+    font-size: 0.875rem;
+    padding-bottom: 0.625rem;
+  }
+
   .grid-container {
     box-sizing: border-box;
     padding: 0.25rem;

@@ -45,7 +45,7 @@ export default function Header() {
 
   return (
     <header className="header">
-      <Link className="header-logo" href="/">Paranoia</Link>
+      <Link className="header-logo" href="/">Pairanoia</Link>
       <nav className="header-nav">
         {isLoading ? (
           <>

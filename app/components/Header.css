@@ -94,8 +94,15 @@
   font-weight: 700;
 }
 
-/* Mobile: icon-only header */
+/* Mobile: icon-only header, sticky */
 @media (width <= 640px) {
+  .header {
+    background: #111827;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
   .header-btn-text {
     display: none;
   }
