@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'aws-amplify/auth';
 import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
@@ -53,6 +53,8 @@ function PasswordInput({
 function SignInForm() {
   const router = useRouter();
   const { checkAuth } = useAuth();
+  const params = useSearchParams();
+  const confirmed = params.get('confirmed') === '1';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -85,7 +87,10 @@ function SignInForm() {
           <LogIn size={28} />
         </div>
         <h1 className={classes.title}>Sign In</h1>
-        <p className={classes.subtitle}>Welcome back</p>
+        {confirmed
+          ? <p className={classes.hint} style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Account confirmed! Please sign in.</p>
+          : <p className={classes.subtitle}>Welcome back</p>
+        }
 
         <form onSubmit={handleSubmit}>
           <div className={classes['field-group']}>
