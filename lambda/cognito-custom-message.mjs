@@ -1,26 +1,21 @@
 export const handler = async (event) => {
+  console.log('triggerSource:', event.triggerSource);
+  console.log('event:', JSON.stringify(event, null, 2));
+
   if (
     event.triggerSource === 'CustomMessage_SignUp' ||
     event.triggerSource === 'CustomMessage_ResendCode'
   ) {
-    const email = event.request.userAttributes.email;
-    const code = event.request.codeParameter;
-    const confirmUrl = `https://pairanoia.vercel.app/confirm?email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}`;
-
     event.response.emailSubject = 'Confirm your Pairanoia account';
     event.response.emailMessage = `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 2rem;">
-        <h2 style="color: #84cc16;">Confirm your account</h2>
-        <p>Thanks for signing up for Pairanoia! Click the button below to verify your email address.</p>
-        <a href="${confirmUrl}"
-           style="display: inline-block; background: #84cc16; color: #111827; font-weight: 700;
-                  padding: 0.75rem 1.5rem; border-radius: 0.5rem; text-decoration: none; margin: 1rem 0;">
-          Confirm Account
-        </a>
-        <p style="color: #6b7280; font-size: 0.875rem;">
-          Or copy this link into your browser:<br>
-          <span style="word-break: break-all;">${confirmUrl}</span>
-        </p>
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:2rem;background:#111827;border-radius:0.75rem;">
+        <h2 style="color:#84cc16;margin:0 0 0.5rem;">Pairanoia</h2>
+        <p style="color:#9ca3af;margin:0 0 2rem;">Thanks for signing up! Enter the code below to confirm your account.</p>
+        <div style="background:#1f2937;border:2px solid #84cc16;border-radius:0.5rem;padding:1.5rem;text-align:center;margin-bottom:2rem;">
+          <p style="color:#9ca3af;font-size:0.75rem;margin:0 0 0.5rem;letter-spacing:0.1em;text-transform:uppercase;">Verification Code</p>
+          <p style="color:#84cc16;font-size:2rem;font-weight:700;letter-spacing:0.25em;margin:0;">{####}</p>
+        </div>
+        <p style="color:#6b7280;font-size:0.75rem;margin:0;">This code expires in 24 hours. If you didn't create a Pairanoia account, ignore this email.</p>
       </div>
     `;
   }

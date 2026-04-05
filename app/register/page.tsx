@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { signUp, resendSignUpCode } from 'aws-amplify/auth';
-import { UserPlus, User, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { signUp, confirmSignUp, resendSignUpCode } from 'aws-amplify/auth';
+import { UserPlus, User, Mail, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { isValidEmail } from '../util/validation';
 import classes from '../components/auth.module.css';
 
@@ -73,6 +73,8 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [needsConfirmation, setNeedsConfirmation] = useState(false);
+  const [code, setCode] = useState('');
+  const [isConfirming, setIsConfirming] = useState(false);
   const [resent, setResent] = useState(false);
 
   async function handleSignUp(e: React.FormEvent<HTMLFormElement>) {
@@ -112,6 +114,20 @@ export default function RegisterPage() {
     }
   }
 
+  async function handleConfirm(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError('');
+    setIsConfirming(true);
+    try {
+      await confirmSignUp({ username: email, confirmationCode: code });
+      window.location.href = '/sign-in?confirmed=1';
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsConfirming(false);
+    }
+  }
+
   async function handleResend() {
     setResent(false);
     setError('');
@@ -128,19 +144,41 @@ export default function RegisterPage() {
       <div className={classes.page}>
         <div className={classes.card}>
           <div className={classes['icon-badge']}>
-            <Mail size={28} />
+            <ShieldCheck size={28} />
           </div>
           <h1 className={classes.title}>Check Your Email</h1>
           <p className={classes.subtitle}>
-            We sent a verification link to <strong>{email}</strong>. Click it to confirm your account, then sign in.
+            We sent a 6-digit code to <strong>{email}</strong>. Enter it below to confirm your account.
           </p>
 
-          {error && <p className={classes.error}>{error}</p>}
-          {resent && <p className={classes.hint}>Link resent!</p>}
+          <form onSubmit={handleConfirm}>
+            <div className={classes['field-group']}>
+              <div className={classes.field}>
+                <label htmlFor="code" className={classes['field-label']}>
+                  <Mail size={12} /> Verification Code
+                </label>
+                <input
+                  id="code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                  className={classes.input}
+                  placeholder="123456"
+                />
+              </div>
+            </div>
 
-          <Link href="/sign-in" className={classes['primary-btn']}>
-            Go to Sign In
-          </Link>
+            {error && <p className={classes.error}>{error}</p>}
+            {resent && <p className={classes.hint}>Code resent!</p>}
+
+            <button type="submit" disabled={isConfirming || code.length < 6} className={classes['primary-btn']}>
+              {isConfirming ? 'Confirming...' : 'Confirm Account'}
+            </button>
+          </form>
 
           <div className={classes.divider}>
             <div className={classes['divider-line']} />
@@ -149,7 +187,7 @@ export default function RegisterPage() {
           </div>
 
           <button type="button" onClick={handleResend} className={classes['secondary-btn']}>
-            Resend Link
+            Resend Code
           </button>
         </div>
       </div>
