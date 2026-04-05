@@ -181,10 +181,10 @@ function Lives({ count, max = 3 }: { count: number; max?: number }) {
   );
 }
 
-function FreeplayBoard() {
+function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) => void }) {
   const { user } = useAuth();
   const { cardsHidden } = useGameSettings();
-  const { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs } = useMemoryGame();
+  const { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs, devForceComplete } = useMemoryGame();
   const isMobile = getDevice() === "mobile";
   const rowOptions = isMobile ? MOBILE_ROW_OPTIONS : GRID_OPTIONS;
   const colOptions = isMobile ? MOBILE_COL_OPTIONS : GRID_OPTIONS;
@@ -197,6 +197,10 @@ function FreeplayBoard() {
     setPendingRows(rows);
     setPendingCols(cols);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    onActiveChange(started && !allMatched);
+  }, [started, allMatched, onActiveChange]);
 
   // Reset save guard when a new game starts
   useEffect(() => {
@@ -352,11 +356,14 @@ function FreeplayBoard() {
       {started && !allMatched && (
         <button className="btn-abandon" onClick={handleAbandon}>Abandon Game</button>
       )}
+      {process.env.NODE_ENV === 'development' && started && !allMatched && (
+        <button className="btn-dev" onClick={devForceComplete}>⚡ Force Win</button>
+      )}
     </>
   );
 }
 
-function SurvivalBoard() {
+function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) => void }) {
   const { user } = useAuth();
   const { cardsHidden } = useGameSettings();
   const {
@@ -364,7 +371,7 @@ function SurvivalBoard() {
     stage, lives, completions, score, clutchPairs, livesPurchased,
     started, gameOver, survived, timeLeft, timerExpired, levelComplete, pendingStart,
     stageDurationMs, ldm,
-    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs,
+    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs, devForceCompleteLevel,
   } = useSurvivalGame();
 
   const lifeCostFraction = 0.10 + livesPurchased * 0.05;
@@ -381,6 +388,10 @@ function SurvivalBoard() {
   const startedAtRef = useRef<number>(0);
   const savedRef = useRef(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+
+  useEffect(() => {
+    onActiveChange(started && !gameOver);
+  }, [started, gameOver, onActiveChange]);
 
   useEffect(() => {
     if (started) {
@@ -489,22 +500,22 @@ function SurvivalBoard() {
 
   return (
     <>
-      <div className="sticky-bar">
-        <div className="survival-info">
-          <div className="survival-stat">
-            <div className="survival-stat-label">Stage</div>
-            <div className="survival-stat-stage">{stage}</div>
-          </div>
-          <div className="survival-stat">
-            <div className="survival-stat-label">Level</div>
-            <div className="survival-stat-stage">{completions + 1}</div>
-          </div>
-          <div className="survival-stat">
-            <div className="survival-stat-label">Lives</div>
-            <Lives count={lives} max={Math.max(MAX_LIVES, lives)} />
-          </div>
+      <div className="survival-info">
+        <div className="survival-stat">
+          <div className="survival-stat-label">Stage</div>
+          <div className="survival-stat-stage">{stage}</div>
         </div>
+        <div className="survival-stat">
+          <div className="survival-stat-label">Level</div>
+          <div className="survival-stat-stage">{completions + 1}</div>
+        </div>
+        <div className="survival-stat">
+          <div className="survival-stat-label">Lives</div>
+          <Lives count={lives} max={Math.max(MAX_LIVES, lives)} />
+        </div>
+      </div>
 
+      <div className="sticky-bar">
         <div className="timer-row">
           <div className={`timer-box${isLow ? " timer-box-danger" : ""}`}>
             <Clock size={18} color={isLow ? "#ef4444" : "#84cc16"} />
@@ -558,6 +569,18 @@ function SurvivalBoard() {
       />
 
       <div className="stats-bar">
+        <div className="stat stat-mobile-only">
+          <div className="stat-label">Stage</div>
+          <div className="stat-value">{stage}</div>
+        </div>
+        <div className="stat stat-mobile-only">
+          <div className="stat-label">Level</div>
+          <div className="stat-value">{completions + 1}</div>
+        </div>
+        <div className="stat stat-mobile-only">
+          <div className="stat-label">Lives</div>
+          <div className="stat-value">{lives}</div>
+        </div>
         <div className="stat">
           <div className="stat-label">Total Score</div>
           <div className="stat-value stat-value-accent">{score.toLocaleString()}</div>
@@ -578,6 +601,9 @@ function SurvivalBoard() {
       {started && !pendingStart && !timerExpired && !levelComplete && (
         <button className="btn-abandon" onClick={handleAbandon}>Abandon Game</button>
       )}
+      {process.env.NODE_ENV === 'development' && started && !gameOver && !levelComplete && !timerExpired && !pendingStart && (
+        <button className="btn-dev" onClick={devForceCompleteLevel}>⚡ Force Level</button>
+      )}
     </>
   );
 }
@@ -585,6 +611,7 @@ function SurvivalBoard() {
 export default function MemoryGrid() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<"freeplay" | "survival">("freeplay");
+  const [gameActive, setGameActive] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("gameMode");
@@ -594,6 +621,7 @@ export default function MemoryGrid() {
 
   function handleModeChange(next: "freeplay" | "survival") {
     setMode(next);
+    setGameActive(false);
     localStorage.setItem("gameMode", next);
   }
 
@@ -601,24 +629,28 @@ export default function MemoryGrid() {
 
   return (
     <div className="game-board">
-      <div className="mode-toggle">
-        <div className="mode-toggle-track">
-          <button
-            className={`mode-btn${mode === "freeplay" ? " mode-btn-active" : ""}`}
-            onClick={() => handleModeChange("freeplay")}
-          >
-            Freeplay
-          </button>
-          <button
-            className={`mode-btn${mode === "survival" ? " mode-btn-active" : ""}`}
-            onClick={() => handleModeChange("survival")}
-          >
-            Survival
-          </button>
+      {!gameActive && (
+        <div className="mode-toggle">
+          <div className="mode-toggle-track">
+            <button
+              className={`mode-btn${mode === "freeplay" ? " mode-btn-active" : ""}`}
+              onClick={() => handleModeChange("freeplay")}
+            >
+              Freeplay
+            </button>
+            <button
+              className={`mode-btn${mode === "survival" ? " mode-btn-active" : ""}`}
+              onClick={() => handleModeChange("survival")}
+            >
+              Survival
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {mode === "freeplay" ? <FreeplayBoard /> : <SurvivalBoard />}
+      {mode === "freeplay"
+        ? <FreeplayBoard onActiveChange={setGameActive} />
+        : <SurvivalBoard onActiveChange={setGameActive} />}
     </div>
   );
 }

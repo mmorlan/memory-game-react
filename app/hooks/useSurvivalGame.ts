@@ -336,11 +336,15 @@ export default function useSurvivalGame() {
     return Math.round(totalPairTimeMsRef.current / matchedPairCountRef.current);
   }
 
+  function devForceCompleteLevel(): void {
+    setBoard(prev => prev.map(c => ({ ...c, matched: true })));
+  }
+
   return {
     board, rows, cols,
     stage, lives, completions, score, clutchPairs, livesPurchased,
     started, gameOver, survived, timeLeft, timerExpired, levelComplete, pendingStart,
     stageDurationMs, ldm: getLDM(completions),
-    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs,
+    handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs, devForceCompleteLevel,
   };
 }

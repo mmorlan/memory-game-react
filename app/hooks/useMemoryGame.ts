@@ -138,5 +138,9 @@ export default function useMemoryGame() {
     return Math.round(totalPairTimeMsRef.current / matchedPairCountRef.current);
   }
 
-  return { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs };
+  function devForceComplete(): void {
+    setBoard(prev => prev.map(c => ({ ...c, matched: true })));
+  }
+
+  return { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs, devForceComplete };
 }
