@@ -44,6 +44,10 @@ jobs:
         env:
           VERCEL_ORG_ID: team_CzMeRQIEaq7mM7Q9BqMuHumb
           VERCEL_PROJECT_ID: prj_L5Q49iNmkfjbu8njda3aOYh2AhaG
+          NEXT_PUBLIC_AWS_REGION: ${{ secrets.NEXT_PUBLIC_AWS_REGION }}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.NEXT_PUBLIC_COGNITO_USER_POOL_ID }}
+          NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${{ secrets.NEXT_PUBLIC_COGNITO_APP_CLIENT_ID }}
+          NEXT_PUBLIC_COGNITO_IDENTITY_POOL_ID: ${{ secrets.NEXT_PUBLIC_COGNITO_IDENTITY_POOL_ID }}
 
       - name: Deploy
         id: deploy
