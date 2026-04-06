@@ -31,12 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Save any game completed while the user was unauthenticated
       const raw = typeof window !== 'undefined' ? localStorage.getItem('pendingGame') : null;
       if (raw) {
+        localStorage.removeItem('pendingGame');
         try {
           await saveGame(currentUser.userId, JSON.parse(raw));
         } catch {
           // Silently fail — don't block auth if the save fails
-        } finally {
-          localStorage.removeItem('pendingGame');
         }
       }
     } catch {
