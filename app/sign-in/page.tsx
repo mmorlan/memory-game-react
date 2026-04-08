@@ -96,7 +96,7 @@ function SignInForm() {
           <div className={classes['field-group']}>
             <div className={classes.field}>
               <label htmlFor="email" className={classes['field-label']}>
-                <Mail size={12} /> Username or Email
+                <Mail size={12} /> Email
               </label>
               <input
                 id="email"

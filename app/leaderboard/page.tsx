@@ -125,7 +125,7 @@ export default function LeaderboardPage() {
   return (
     <main className={classes.page}>
       <div className={classes.header}>
-        <Trophy size={28} color="#84cc16" />
+        <Trophy size={28} color="#00ff3c" />
         <h1 className={classes.title}>Leaderboard</h1>
       </div>
 

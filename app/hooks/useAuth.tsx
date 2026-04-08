@@ -14,9 +14,35 @@ interface AuthContextValue {
   handleSignOut: () => Promise<void>;
 }
 
+const AUTH_CACHE_KEY = 'auth_cache';
+
+interface AuthCache {
+  userId: string;
+  username: string;
+}
+
+function loadAuthCache(): AuthCache | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(AUTH_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as AuthCache) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveAuthCache(userId: string, username: string) {
+  localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({ userId, username }));
+}
+
+function clearAuthCache() {
+  localStorage.removeItem(AUTH_CACHE_KEY);
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Always start with null/true to match SSR — cache is applied client-side in useEffect
   const [user, setUser] = useState<AuthUser | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,8 +51,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const currentUser = await getCurrentUser();
       const attrs = await fetchUserAttributes();
+      const resolvedUsername = attrs.preferred_username ?? currentUser.signInDetails?.loginId ?? currentUser.username;
       setUser(currentUser);
-      setUsername(attrs.preferred_username ?? currentUser.signInDetails?.loginId ?? currentUser.username);
+      setUsername(resolvedUsername);
+      saveAuthCache(currentUser.userId, resolvedUsername);
 
       // Save any game completed while the user was unauthenticated
       const raw = typeof window !== 'undefined' ? localStorage.getItem('pendingGame') : null;
@@ -39,14 +67,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch {
+      // Confirmed logged out — clear cached state
       setUser(null);
       setUsername(null);
+      clearAuthCache();
     } finally {
       setIsLoading(false);
     }
   }
 
   async function handleSignOut(): Promise<void> {
+    clearAuthCache();
     localStorage.removeItem('survivalGameState');
     localStorage.removeItem('gameMode');
     ['mg-started', 'mg-board', 'mg-rows', 'mg-cols', 'mg-start', 'mg-end', 'mg-score'].forEach(k =>
@@ -58,6 +89,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
+    // Apply cache synchronously before checkAuth resolves to prevent flash
+    const cached = loadAuthCache();
+    if (cached) {
+      setUser({ userId: cached.userId } as AuthUser);
+      setUsername(cached.username);
+      setIsLoading(false);
+    }
     checkAuth();
   }, []);
 

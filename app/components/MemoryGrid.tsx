@@ -11,8 +11,62 @@ import useSurvivalGame, { COMPLETIONS_PER_STAGE, MAX_LIVES } from "../hooks/useS
 import { Card } from "../hooks/useMemoryGame";
 import useAuth from "../hooks/useAuth";
 import useGameSettings from "../hooks/useGameSettings";
-import { saveGame } from "../util/dynamodb";
+import { saveGame, getSurvivalLevelLeaderboard, SurvivalLevelEntry } from "../util/dynamodb";
 import { formatTime, getTimeMultiplier } from "../util/scoring";
+
+function LevelLeaderboard({ stage, level, currentUserId, currentUsername, currentScore }: {
+  stage: number;
+  level: number;
+  currentUserId?: string;
+  currentUsername?: string | null;
+  currentScore?: number;
+}) {
+  const [entries, setEntries] = useState<SurvivalLevelEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const levelId = `STAGE#${stage}#LEVEL#${level}`;
+    getSurvivalLevelLeaderboard(levelId, 10)
+      .then(setEntries)
+      .catch((e) => console.error("LevelLeaderboard fetch failed:", e))
+      .finally(() => setLoading(false));
+  }, [stage, level]);
+
+  // Merge current user's score optimistically so it shows immediately
+  const merged: SurvivalLevelEntry[] = (() => {
+    if (!currentUserId || currentScore === undefined) return entries;
+    const withoutMe = entries.filter(e => e.userId !== currentUserId);
+    const myEntry: SurvivalLevelEntry = {
+      levelId: `STAGE#${stage}#LEVEL#${level}`,
+      userId: currentUserId,
+      score: currentScore,
+      username: currentUsername ?? undefined,
+      completedAt: new Date().toISOString(),
+    };
+    return [...withoutMe, myEntry].sort((a, b) => b.score - a.score).slice(0, 10);
+  })();
+
+  return (
+    <div className="level-leaderboard">
+      <div className="level-leaderboard-title">Stage {stage} · Level {level} — Top Scores</div>
+      {loading ? (
+        <div className="level-leaderboard-loading">Loading...</div>
+      ) : merged.length === 0 ? (
+        <div className="level-leaderboard-empty">No scores yet — you're first!</div>
+      ) : (
+        <ol className="level-leaderboard-list">
+          {merged.map((e, i) => (
+            <li key={e.userId} className={`level-leaderboard-row${e.userId === currentUserId ? " level-leaderboard-row-you" : ""}`}>
+              <span className="level-lb-rank">#{i + 1}</span>
+              <span className="level-lb-name">{e.username ?? "Anonymous"}</span>
+              <span className="level-lb-score">{e.score.toLocaleString()}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
 
 function SaveScoreModal({ score, onSkip }: { score: number; onSkip: () => void }) {
   const router = useRouter();
@@ -313,7 +367,7 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       <div className="sticky-bar">
         <div className="timer-row">
           <div className="timer-box">
-            <Clock size={18} color="#84cc16" />
+            <Clock size={18} color="#00ff3c" />
             <div className="timer-value">{started ? formatTime(elapsed) : "0:00"}</div>
           </div>
           <ScoringFormula terms={[
@@ -364,13 +418,13 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
 }
 
 function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) => void }) {
-  const { user } = useAuth();
+  const { user, username } = useAuth();
   const { cardsHidden } = useGameSettings();
   const {
     board, rows, cols,
     stage, lives, completions, score, clutchPairs, livesPurchased,
     started, gameOver, survived, timeLeft, timerExpired, levelComplete, pendingStart,
-    stageDurationMs, ldm,
+    stageDurationMs, ldm, levelScore, lastLevelScore,
     handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs, devForceCompleteLevel,
   } = useSurvivalGame();
 
@@ -390,8 +444,8 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   useEffect(() => {
-    onActiveChange(started && !gameOver);
-  }, [started, gameOver, onActiveChange]);
+    onActiveChange(started && !gameOver && !pendingStart && !levelComplete);
+  }, [started, gameOver, pendingStart, levelComplete, onActiveChange]);
 
   useEffect(() => {
     if (started) {
@@ -447,9 +501,9 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
     setShowSaveModal(true);
   }, [gameOver, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Save completed survival run to DynamoDB
+  // Save completed survival run to DynamoDB — only if player survived (not timed out)
   useEffect(() => {
-    if (!gameOver || !user || savedRef.current) return;
+    if (!gameOver || !survived || !user || savedRef.current) return;
     savedRef.current = true;
     const pairs = Math.floor((rows * cols) / 2);
     const now = new Date().toISOString();
@@ -470,7 +524,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       survived,
       remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
     }).catch(console.error);
-  }, [gameOver, user, rows, cols, score, stage]);
+  }, [gameOver, survived, user, rows, cols, score, stage]);
 
   if (gameOver && survived) {
     return (
@@ -518,7 +572,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       <div className="sticky-bar">
         <div className="timer-row">
           <div className={`timer-box${isLow ? " timer-box-danger" : ""}`}>
-            <Clock size={18} color={isLow ? "#ef4444" : "#84cc16"} />
+            <Clock size={18} color={isLow ? "#ef4444" : "#00ff3c"} />
             <div>
               <div className={`timer-value${isLow ? " timer-value-danger" : ""}`}>
                 {formatTime(timeLeft)}
@@ -557,16 +611,31 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
         )}
       </div>
 
-      <GameGrid
-        board={board}
-        cols={cols}
-        started={started}
-        pendingRows={rows}
-        pendingCols={cols}
-        onCardClick={handleCardClick}
-        cardsHidden={cardsHidden}
-        revealAll={timerExpired}
-      />
+      {levelComplete ? (
+        <>
+          {!user && (
+            <div className="level-auth-prompt">
+              <div className="level-auth-prompt-text">Sign in to save your score to the leaderboard</div>
+              <div className="level-auth-prompt-buttons">
+                <a href="/register" className="btn-start level-auth-btn">Register</a>
+                <a href="/sign-in" className="level-auth-btn-secondary">Sign In</a>
+              </div>
+            </div>
+          )}
+          <LevelLeaderboard stage={stage} level={completions + 1} currentUserId={user?.userId} currentUsername={username} currentScore={lastLevelScore} />
+        </>
+      ) : (
+        <GameGrid
+          board={board}
+          cols={cols}
+          started={started}
+          pendingRows={rows}
+          pendingCols={cols}
+          onCardClick={handleCardClick}
+          cardsHidden={cardsHidden}
+          revealAll={timerExpired}
+        />
+      )}
 
       <div className="stats-bar">
         <div className="stat stat-mobile-only">
@@ -581,13 +650,19 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
           <div className="stat-label">Lives</div>
           <div className="stat-value">{lives}</div>
         </div>
+        {started && !levelComplete && (
+          <div className="stat">
+            <div className="stat-label">Level Score</div>
+            <div className="stat-value">{levelScore.toLocaleString()}</div>
+          </div>
+        )}
         <div className="stat">
           <div className="stat-label">Total Score</div>
           <div className="stat-value stat-value-accent">{score.toLocaleString()}</div>
         </div>
       </div>
 
-      {started && !gameOver && !pendingStart && canBuyLife && (
+      {started && !gameOver && !pendingStart && canBuyLife && lives < MAX_LIVES && (
         <div className="buy-life-row">
           <button className="btn-buy-life" onClick={buyLife}>
             Buy Life — {lifeCostPct}% of score ({lifeCost.toLocaleString()} pts)
@@ -598,7 +673,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
         </div>
       )}
 
-      {started && !pendingStart && !timerExpired && !levelComplete && (
+      {started && !timerExpired && (
         <button className="btn-abandon" onClick={handleAbandon}>Abandon Game</button>
       )}
       {process.env.NODE_ENV === 'development' && started && !gameOver && !levelComplete && !timerExpired && !pendingStart && (

@@ -5,6 +5,7 @@ import useAuth from "../hooks/useAuth";
 import useGameSettings from "../hooks/useGameSettings";
 import Link from "next/link";
 import { User, Trophy, LogOut, Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
 import "./Header.css";
 
 function MobileAuthMenu() {
@@ -45,7 +46,10 @@ export default function Header() {
 
   return (
     <header className="header">
-      <Link className="header-logo" href="/">Pairanoia</Link>
+      <Link className="header-logo" href="/">
+        <Image src="/logo.png" alt="" width={30} height={24} />
+        Pairanoia
+      </Link>
       <nav className="header-nav">
         {isLoading ? (
           <>
@@ -92,7 +96,7 @@ export default function Header() {
           </button>
         )}
         <Link href="/leaderboard" className="header-btn">
-          <Trophy size={16} color="#84cc16" />
+          <Trophy size={16} color="#00ff3c" />
           <span className="header-btn-text">Leaderboard</span>
         </Link>
       </nav>

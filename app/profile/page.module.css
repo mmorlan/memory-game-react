@@ -44,7 +44,7 @@
 
 .upload-btn {
   align-items: center;
-  background: #84cc16;
+  background: #00ff3c;
   border: 2px solid #111827;
   border-radius: 9999px;
   bottom: 0;
@@ -102,7 +102,7 @@
 .edit-link {
   background: none;
   border: none;
-  color: #84cc16;
+  color: #00ff3c;
   cursor: pointer;
   font: inherit;
   font-size: 0.8rem;
@@ -143,7 +143,7 @@
 }
 
 .bio-input:focus {
-  border-color: #84cc16;
+  border-color: #00ff3c;
   outline: none;
 }
 
@@ -153,7 +153,7 @@
 }
 
 .save-btn {
-  background: #84cc16;
+  background: #00ff3c;
   border: none;
   border-radius: 0.5rem;
   color: #111827;
@@ -181,7 +181,7 @@
 }
 
 .success {
-  color: #84cc16;
+  color: #00ff3c;
   font-size: 0.875rem;
   margin-bottom: 0.5rem;
 }
@@ -225,7 +225,7 @@
 .stats-grid {
   display: grid;
   gap: 1rem;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
   margin-bottom: 1.5rem;
 }
 
@@ -318,7 +318,7 @@
 }
 
 .mode-freeplay {
-  color: #84cc16;
+  color: #00ff3c;
   text-transform: capitalize;
 }
 
@@ -335,7 +335,7 @@
 }
 
 .play-link {
-  color: #84cc16;
+  color: #00ff3c;
   text-decoration: none;
 }
 

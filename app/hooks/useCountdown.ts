@@ -6,17 +6,27 @@ export default function useCountdown(
   resetKey: number,
   initialTimeMs?: number,
 ): number {
-  const [timeLeft, setTimeLeft] = useState(initialTimeMs ?? durationMs);
-  const mounted = useRef(false);
+  // Always match SSR (durationMs); restored time is applied via effect below.
+  const [timeLeft, setTimeLeft] = useState(durationMs);
+  const prevResetKeyRef = useRef(resetKey);
 
-  // Skip the effect on initial mount so initialTimeMs is preserved;
-  // subsequent resetKey changes (new level) reset to full durationMs.
+  // Apply restored time after mount. Using a ref avoids Strict Mode double-fire
+  // overwriting the value — the restored value stays correct either way.
   useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
+    if (initialTimeMs !== undefined) {
+      setTimeLeft(initialTimeMs);
     }
-    setTimeLeft(durationMs);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset to full duration only when resetKey actually changes (new level).
+  // Using a ref comparison instead of the mounted-flag trick so Strict Mode
+  // double-invocation doesn't accidentally trigger a reset on initial mount.
+  useEffect(() => {
+    if (prevResetKeyRef.current !== resetKey) {
+      prevResetKeyRef.current = resetKey;
+      setTimeLeft(durationMs);
+    }
   }, [resetKey, durationMs]);
 
   useEffect(() => {

@@ -114,6 +114,51 @@ export async function getLeaderboard(leaderboardKey: string, limit = 10): Promis
   return entries.map(e => ({ ...e, username: usernameMap[e.userId] }));
 }
 
+export interface SurvivalLevelEntry {
+  levelId: string;
+  userId: string;
+  score: number;
+  username?: string;
+  completedAt: string;
+}
+
+export async function saveSurvivalLevelScore(
+  userId: string,
+  levelId: string,
+  score: number,
+  username: string,
+): Promise<void> {
+  const client = await getDocumentClient();
+  try {
+    await client.send(new PutCommand({
+      TableName: "memory_survival_levels",
+      Item: { levelId, userId, score, username, completedAt: new Date().toISOString() },
+      ConditionExpression: "attribute_not_exists(#s) OR #s < :newScore",
+      ExpressionAttributeNames: { "#s": "score" },
+      ExpressionAttributeValues: { ":newScore": score },
+    }));
+  } catch (e: unknown) {
+    // ConditionalCheckFailedException means existing score is already better — ignore
+    if ((e as { name?: string }).name !== "ConditionalCheckFailedException") throw e;
+  }
+}
+
+export async function getSurvivalLevelLeaderboard(
+  levelId: string,
+  limit = 10,
+): Promise<SurvivalLevelEntry[]> {
+  const client = await getDocumentClient();
+  const result = await client.send(new QueryCommand({
+    TableName: "memory_survival_levels",
+    IndexName: "level-score-index",
+    KeyConditionExpression: "levelId = :levelId",
+    ExpressionAttributeValues: { ":levelId": levelId },
+    ScanIndexForward: false,
+    Limit: limit,
+  }));
+  return (result.Items ?? []) as SurvivalLevelEntry[];
+}
+
 export async function getUserGames(userId: string): Promise<GameRecord[]> {
   const client = await getDocumentClient();
   const result = await client.send(new QueryCommand({

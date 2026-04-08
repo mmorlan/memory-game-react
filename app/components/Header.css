@@ -9,9 +9,12 @@
 }
 
 .header-logo {
+  align-items: center;
   color: #fff;
+  display: flex;
   font-size: 1.125rem;
   font-weight: 700;
+  gap: 0.5rem;
   padding-left: 1rem;
 }
 
@@ -40,7 +43,7 @@
 }
 
 .header-btn-primary {
-  background: #84cc16;
+  background: #00ff3c;
   color: #111827;
   font-weight: 700;
 }
@@ -90,7 +93,7 @@
 }
 
 .header-auth-dropdown-item-primary {
-  color: #84cc16;
+  color: #00ff3c;
   font-weight: 700;
 }
 
