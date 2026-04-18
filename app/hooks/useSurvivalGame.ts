@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, createShuffledBoard } from "./useMemoryGame";
 import useCountdown from "./useCountdown";
-import { calcPairScore } from "../util/scoring";
+import { calcPairScore, getTimeMultiplier } from "../util/scoring";
 import { SIMILAR_ICON_GROUPS } from "../components/icons";
 import { saveSurvivalLevelScore } from "../util/dynamodb";
 import { getCurrentUser, fetchUserAttributes } from "aws-amplify/auth";
@@ -34,6 +34,9 @@ interface SurvivalSaveState {
   totalPairTimeMsMs: number;
   matchedPairCount: number;
   timerEndTimestamp: number | null;
+  survivalGameId: string;
+  pairTierCounts: Record<string, number>;
+  timeBonus: number;
 }
 
 function loadSaveState(): SurvivalSaveState | null {
@@ -143,6 +146,9 @@ export default function useSurvivalGame() {
   const [lastLevelScore, setLastLevelScore] = useState<number>(s?.lastLevelScore ?? 0);
   const [clutchPairs, setClutchPairs] = useState<number>(s?.clutchPairs ?? 0);
   const [livesPurchased, setLivesPurchased] = useState<number>(s?.livesPurchased ?? 0);
+  const [survivalGameId, setSurvivalGameId] = useState<string>(s?.survivalGameId ?? '');
+  const [pairTierCounts, setPairTierCounts] = useState<Record<string, number>>(s?.pairTierCounts ?? {});
+  const [timeBonus, setTimeBonus] = useState<number>(s?.timeBonus ?? 0);
   // pendingStart: timer not running, board ready, waiting for "Start Game" click
   const [pendingStart, setPendingStart] = useState<boolean>(
     !!(s?.started && !s?.gameOver && !s?.levelComplete && !s?.timerExpired && !timerExpiredWhileAway && !timerWasRunning)
@@ -168,6 +174,9 @@ export default function useSurvivalGame() {
     timerKey,
     restoredTimeLeft ?? undefined,
   );
+  // Always-current ref so level-complete effect can read timeLeft without adding it to deps
+  const timeLeftRef = useRef<number>(restoredTimeLeft ?? stageDurationMs);
+  timeLeftRef.current = timeLeft;
 
   // Persist state to localStorage whenever key values change
   useEffect(() => {
@@ -179,9 +188,12 @@ export default function useSurvivalGame() {
       totalPairTimeMsMs: totalPairTimeMsRef.current,
       matchedPairCount: matchedPairCountRef.current,
       timerEndTimestamp: timerEndTimestampRef.current,
+      survivalGameId,
+      pairTierCounts,
+      timeBonus,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(state));
-  }, [stage, lives, completions, score, clutchPairs, livesPurchased, started, gameOver, survived, timerExpired, levelComplete, board, timerActive]);
+  }, [stage, lives, completions, score, clutchPairs, livesPurchased, started, gameOver, survived, timerExpired, levelComplete, board, timerActive, survivalGameId, pairTierCounts, timeBonus]);
 
   // Board completed — commit levelScore to total, save leaderboard entry, wait to advance
   useEffect(() => {
@@ -190,7 +202,8 @@ export default function useSurvivalGame() {
     setTimerActive(false);
     timerEndTimestampRef.current = null;
 
-    const earned = levelScoreRef.current;
+    const bonus = Math.floor(timeLeftRef.current / 1000) * 10;
+    const earned = levelScoreRef.current + bonus;
     const newTotal = scoreRef.current + earned;
     const levelId = `STAGE#${stage}#LEVEL#${completions + 1}`;
     scoreRef.current = newTotal;
@@ -198,6 +211,7 @@ export default function useSurvivalGame() {
     setScore(newTotal);
     setLevelScore(0);
     setLastLevelScore(earned);
+    setTimeBonus(bonus);
 
     getCurrentUser().then(u => fetchUserAttributes().then(attrs => {
       const username = attrs.preferred_username ?? u.signInDetails?.loginId ?? u.username;
@@ -243,6 +257,8 @@ export default function useSurvivalGame() {
         const pairScore = calcPairScore(totalPairs, elapsed, ldm);
         levelScoreRef.current += pairScore;
         setLevelScore(prev => prev + pairScore);
+        const tm = getTimeMultiplier(elapsed, totalPairs);
+        setPairTierCounts(prev => ({ ...prev, [String(tm)]: (prev[String(tm)] ?? 0) + 1 }));
       } else {
         setTimeout(() => {
           setBoard(prev => prev.map(c => c.clicked && !c.matched ? { ...c, clicked: false } : c));
@@ -258,6 +274,8 @@ export default function useSurvivalGame() {
     setTimerActive(true);
     levelScoreRef.current = 0;
     setLevelScore(0);
+    setPairTierCounts({});
+    setTimeBonus(0);
     lastPairTimeRef.current = Date.now();
     timerEndTimestampRef.current = Date.now() + stageDurationMs;
   }
@@ -327,12 +345,15 @@ export default function useSurvivalGame() {
     setLevelComplete(false);
     setPendingStart(false);
     setStarted(true);
+    setSurvivalGameId(crypto.randomUUID());
     scoreRef.current = 0;
     levelScoreRef.current = 0;
     setScore(0);
     setLevelScore(0);
     setClutchPairs(0);
     setLivesPurchased(0);
+    setPairTierCounts({});
+    setTimeBonus(0);
     lastPairTimeRef.current = Date.now();
     totalPairTimeMsRef.current = 0;
     matchedPairCountRef.current = 0;
@@ -357,6 +378,7 @@ export default function useSurvivalGame() {
     setScore(0);
     setClutchPairs(0);
     setLivesPurchased(0);
+    setSurvivalGameId('');
     lastPairTimeRef.current = Date.now();
     totalPairTimeMsRef.current = 0;
     matchedPairCountRef.current = 0;
@@ -376,7 +398,7 @@ export default function useSurvivalGame() {
     board, rows, cols,
     stage, lives, completions, score, levelScore, lastLevelScore, clutchPairs, livesPurchased,
     started, gameOver, survived, timeLeft, timerExpired, levelComplete, pendingStart,
-    stageDurationMs, ldm: getLDM(completions),
+    stageDurationMs, ldm: getLDM(completions), survivalGameId, pairTierCounts, timeBonus,
     handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs, devForceCompleteLevel,
   };
 }

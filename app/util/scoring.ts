@@ -1,19 +1,21 @@
-export function getTimeMultiplier(ms: number): number {
-  if (ms < 3_000) return 5;
-  if (ms < 10_000) return 3;
-  if (ms < 20_000) return 2;
-  if (ms < 35_000) return 1.5;
-  if (ms < 50_000) return 1.2;
+// Thresholds are proportional to the timer duration (t = 7.5s × pairs) so multiplier
+// windows scale consistently across all grid sizes. The 1.2× tier has been removed.
+export function getTimeMultiplier(ms: number, totalPairs: number): number {
+  const t = 7.5 * totalPairs * 1000; // timer duration in ms
+  if (ms < t / 20)  return 5;
+  if (ms < t / 6)   return 3;
+  if (ms < t / 3)   return 2;
+  if (ms < t / 1.5) return 1.5;
   return 1;
 }
 
 // Score for a single matched pair.
-// totalPairs: total pairs in the grid (for PM)
-// timeToPairMs: ms elapsed since the last match (or game start)
+// totalPairs: total pairs in the grid (for PM and threshold scaling)
+// elapsedMs: ms elapsed since game/level start at the moment of the match
 // ldm: Level Difficulty Multiplier (1 = freeplay / survival level 1, 1.5 = level 2, 2 = level 3)
-export function calcPairScore(totalPairs: number, timeToPairMs: number, ldm = 1): number {
+export function calcPairScore(totalPairs: number, elapsedMs: number, ldm = 1): number {
   const pm = totalPairs / 8;
-  const tm = getTimeMultiplier(timeToPairMs);
+  const tm = getTimeMultiplier(elapsedMs, totalPairs);
   return Math.round(100 * pm * tm * ldm);
 }
 

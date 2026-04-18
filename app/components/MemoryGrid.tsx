@@ -25,12 +25,13 @@ function LevelLeaderboard({ stage, level, currentUserId, currentUsername, curren
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!currentUserId) { setLoading(false); return; }
     const levelId = `STAGE#${stage}#LEVEL#${level}`;
     getSurvivalLevelLeaderboard(levelId, 10)
       .then(setEntries)
       .catch((e) => console.error("LevelLeaderboard fetch failed:", e))
       .finally(() => setLoading(false));
-  }, [stage, level]);
+  }, [stage, level, currentUserId]);
 
   // Merge current user's score optimistically so it shows immediately
   const merged: SurvivalLevelEntry[] = (() => {
@@ -68,6 +69,93 @@ function LevelLeaderboard({ stage, level, currentUserId, currentUsername, curren
   );
 }
 
+function getTierLabels(totalPairs: number): { tm: number; label: string }[] {
+  const t = 7.5 * totalPairs; // timer duration in seconds
+  const s = (n: number) => Math.round(t / n);
+  return [
+    { tm: 5,   label: `< ${s(20)}s`            },
+    { tm: 3,   label: `${s(20)}–${s(6)}s`       },
+    { tm: 2,   label: `${s(6)}–${s(3)}s`        },
+    { tm: 1.5, label: `${s(3)}–${s(1.5)}s`      },
+    { tm: 1,   label: `> ${s(1.5)}s`            },
+  ];
+}
+
+function ScoreBreakdown({ pairTierCounts, timeBonus, pm, ldm, totalScore, totalPairs }: {
+  pairTierCounts: Record<string, number>;
+  timeBonus: number;
+  pm: number;
+  ldm: number;
+  totalScore: number;
+  totalPairs: number;
+}) {
+  const rows = getTierLabels(totalPairs).flatMap(({ tm, label }) => {
+    const pairs = pairTierCounts[String(tm)] ?? 0;
+    if (pairs === 0) return [];
+    const ptsEach = Math.round(100 * pm * tm * ldm);
+    return [{ label, tm, pairs, ptsEach, subtotal: pairs * ptsEach }];
+  });
+  const pairTotal = rows.reduce((sum, r) => sum + r.subtotal, 0);
+  const secondsLeft = timeBonus / 10; // already floored at calculation time
+
+  return (
+    <div className="score-breakdown">
+      <div className="score-breakdown-title">Score Breakdown</div>
+      <table className="score-breakdown-table">
+        <thead>
+          <tr>
+            <th className="sbt-label">Elapsed</th>
+            <th className="sbt-mult">Mult</th>
+            <th className="sbt-pairs">Pairs</th>
+            <th className="sbt-pts">Pts ea.</th>
+            <th className="sbt-sub">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.label}>
+              <td className="sbt-label">{r.label}</td>
+              <td className="sbt-mult" style={{ color: getMultiplierColor(r.tm) }}>{r.tm}×</td>
+              <td className="sbt-pairs">{r.pairs}</td>
+              <td className="sbt-pts">{r.ptsEach.toLocaleString()}</td>
+              <td className="sbt-sub">{r.subtotal.toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr className="sbt-subtotal-row">
+            <td colSpan={4}>Pair Score</td>
+            <td>{pairTotal.toLocaleString()}</td>
+          </tr>
+          {timeBonus > 0 && (
+            <tr className="sbt-bonus-row">
+              <td colSpan={4}>Time Bonus (+{secondsLeft}s remaining)</td>
+              <td>+{timeBonus.toLocaleString()}</td>
+            </tr>
+          )}
+          <tr className="sbt-total-row">
+            <td colSpan={4}>Level Total</td>
+            <td>{totalScore.toLocaleString()}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+function ConfirmAbandonModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="modal-overlay">
+      <div className="save-score-modal">
+        <div className="modal-title">Abandon Game?</div>
+        <p className="modal-body">Your progress will be lost. Are you sure you want to quit?</p>
+        <button className="btn-danger modal-btn-full" onClick={onConfirm}>Yes, Abandon</button>
+        <button className="modal-btn-secondary" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 function SaveScoreModal({ score, onSkip }: { score: number; onSkip: () => void }) {
   const router = useRouter();
   return (
@@ -101,7 +189,15 @@ function getDevice(): "desktop" | "mobile" {
 
 function fmt(n: number) { return n % 1 === 0 ? String(n) : n.toFixed(1); }
 
-function ScoringFormula({ terms }: { terms: { value: string; label: string }[] }) {
+function getMultiplierColor(tm: number): string {
+  if (tm >= 5)   return '#facc15'; // gold
+  if (tm >= 3)   return '#a855f7'; // purple
+  if (tm >= 2)   return '#22d3ee'; // cyan
+  if (tm >= 1.5) return '#00ff3c'; // lime (app theme)
+  return '#ffffff';                 // white (1×)
+}
+
+function ScoringFormula({ terms }: { terms: { value: string; label: string; color?: string }[] }) {
   return (
     <div className="scoring-box">
       <div className="scoring-label">Scoring Formula</div>
@@ -109,7 +205,7 @@ function ScoringFormula({ terms }: { terms: { value: string; label: string }[] }
         {terms.flatMap((t, i) => [
           ...(i > 0 ? [<span key={`op-${i}`} className="scoring-op">×</span>] : []),
           <div key={t.label} className="scoring-term">
-            <div className="scoring-value">{t.value}</div>
+            <div className="scoring-value" style={t.color ? { color: t.color } : undefined}>{t.value}</div>
             <div className="scoring-term-label">{t.label}</div>
           </div>,
         ])}
@@ -171,11 +267,14 @@ function GameGrid({
   cardsHidden: boolean;
   revealAll?: boolean;
 }) {
+  const activeCols = started ? cols : pendingCols;
+  const iconSize = activeCols >= 8 ? 28 : 32;
+
   return (
     <div className="grid-container">
       <div
         className="memory-grid"
-        style={{ "--cols": started ? cols : pendingCols } as React.CSSProperties}
+        style={{ "--cols": activeCols } as React.CSSProperties}
       >
         {!started
           ? Array.from({ length: pendingRows * pendingCols }, (_, i) => {
@@ -200,7 +299,7 @@ function GameGrid({
                     <div className={`card-inner${isFlipped ? " flipped" : ""}`}>
                       <div className="card-cover" />
                       <div className="card-face">
-                        <IconComponent size={32} />
+                        <IconComponent size={iconSize} />
                       </div>
                     </div>
                   </div>
@@ -212,7 +311,7 @@ function GameGrid({
                   onClick={() => onCardClick(card.id)}
                   className={`memory-card${card.clicked ? " clicked" : ""}${card.matched ? " matched" : ""}`}
                 >
-                  <IconComponent size={32} />
+                  <IconComponent size={iconSize} />
                 </div>
               );
             })}
@@ -246,6 +345,7 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
   const [pendingCols, setPendingCols] = useState(cols);
   const savedRef = useRef(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
 
   useEffect(() => {
     setPendingRows(rows);
@@ -373,7 +473,7 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
           <ScoringFormula terms={[
             { value: "100", label: "Base" },
             { value: fmt(Math.floor((started ? rows * cols : pendingRows * pendingCols) / 2) / 8), label: "Grid" },
-            { value: fmt(getTimeMultiplier(elapsed)), label: "Time" },
+            { value: fmt(getTimeMultiplier(elapsed, Math.floor((started ? rows * cols : pendingRows * pendingCols) / 2))), label: "Time", color: getMultiplierColor(getTimeMultiplier(elapsed, Math.floor((started ? rows * cols : pendingRows * pendingCols) / 2))) },
           ]} />
         </div>
       </div>
@@ -408,7 +508,10 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       </div>
 
       {started && !allMatched && (
-        <button className="btn-abandon" onClick={handleAbandon}>Abandon Game</button>
+        <button className="btn-abandon" onClick={() => setShowAbandonModal(true)}>Abandon Game</button>
+      )}
+      {showAbandonModal && (
+        <ConfirmAbandonModal onConfirm={() => { setShowAbandonModal(false); handleAbandon(); }} onCancel={() => setShowAbandonModal(false)} />
       )}
       {process.env.NODE_ENV === 'development' && started && !allMatched && (
         <button className="btn-dev" onClick={devForceComplete}>⚡ Force Win</button>
@@ -424,7 +527,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
     board, rows, cols,
     stage, lives, completions, score, clutchPairs, livesPurchased,
     started, gameOver, survived, timeLeft, timerExpired, levelComplete, pendingStart,
-    stageDurationMs, ldm, levelScore, lastLevelScore,
+    stageDurationMs, ldm, levelScore, lastLevelScore, survivalGameId, pairTierCounts, timeBonus,
     handleCardClick, startGame, resetGame, beginLevel, advanceLevel, continueAfterTimeout, buyLife, getAvgTimeToPairMs, devForceCompleteLevel,
   } = useSurvivalGame();
 
@@ -437,11 +540,12 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
   const totalPairs = Math.floor((rows * cols) / 2);
   const pm = totalPairs / 8;
   const elapsed = stageDurationMs - timeLeft;
-  const tm = getTimeMultiplier(elapsed);
+  const tm = getTimeMultiplier(elapsed, totalPairs);
 
   const startedAtRef = useRef<number>(0);
   const savedRef = useRef(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
 
   useEffect(() => {
     onActiveChange(started && !gameOver && !pendingStart && !levelComplete);
@@ -460,7 +564,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       const pairs = Math.floor((rows * cols) / 2);
       const now = new Date().toISOString();
       saveGame(user.userId, {
-        gameId: now,
+        gameId: survivalGameId || now,
         mode: "survival",
         score,
         timeMs: Date.now() - startedAtRef.current,
@@ -470,14 +574,36 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
         stage,
         completedAt: now,
         leaderboardkey: "survival",
+        device: getDevice(),
         avgTimeToPairMs: getAvgTimeToPairMs(),
         clutchPairs,
-        survived,
+        survived: false,
         remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
       }).catch(console.error);
     }
     resetGame();
   }
+
+  // Save to main leaderboard on each level completion so in-progress games appear
+  useEffect(() => {
+    if (!levelComplete || !user || score <= 0 || !survivalGameId) return;
+    const pairs = Math.floor((rows * cols) / 2);
+    const now = new Date().toISOString();
+    saveGame(user.userId, {
+      gameId: survivalGameId,
+      mode: "survival",
+      score,
+      timeMs: Date.now() - startedAtRef.current,
+      rows, cols, pairs, stage,
+      completedAt: now,
+      leaderboardkey: "survival",
+      device: getDevice(),
+      avgTimeToPairMs: getAvgTimeToPairMs(),
+      clutchPairs,
+      survived: false,
+      remainingPairs: 0,
+    }).catch(console.error);
+  }, [levelComplete, score, user, survivalGameId, stage, rows, cols, clutchPairs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prompt unauthenticated user to save their score
   useEffect(() => {
@@ -501,14 +627,14 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
     setShowSaveModal(true);
   }, [gameOver, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Save completed survival run to DynamoDB — only if player survived (not timed out)
+  // Save final survival run state to DynamoDB on game over
   useEffect(() => {
-    if (!gameOver || !survived || !user || savedRef.current) return;
+    if (!gameOver || !user || savedRef.current || score <= 0) return;
     savedRef.current = true;
     const pairs = Math.floor((rows * cols) / 2);
     const now = new Date().toISOString();
     saveGame(user.userId, {
-      gameId: now,
+      gameId: survivalGameId || now,
       mode: "survival",
       score,
       timeMs: Date.now() - startedAtRef.current,
@@ -524,7 +650,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       survived,
       remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
     }).catch(console.error);
-  }, [gameOver, survived, user, rows, cols, score, stage]);
+  }, [gameOver, survived, user, rows, cols, score, stage, survivalGameId]);
 
   if (gameOver && survived) {
     return (
@@ -582,8 +708,8 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
           <ScoringFormula terms={[
             { value: "100", label: "Base" },
             { value: fmt(pm), label: "Grid" },
-            { value: fmt(tm), label: "Time" },
-            { value: fmt(ldm), label: "Level" },
+            { value: fmt(tm), label: "Time", color: getMultiplierColor(tm) },
+            { value: fmt(ldm), label: "Level", color: getMultiplierColor(ldm) },
           ]} />
         </div>
       </div>
@@ -612,18 +738,23 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       </div>
 
       {levelComplete ? (
-        <>
+        <div className="level-complete-panel">
           {!user && (
             <div className="level-auth-prompt">
-              <div className="level-auth-prompt-text">Sign in to save your score to the leaderboard</div>
-              <div className="level-auth-prompt-buttons">
-                <a href="/register" className="btn-start level-auth-btn">Register</a>
-                <a href="/sign-in" className="level-auth-btn-secondary">Sign In</a>
-              </div>
+              <div className="level-auth-prompt-text level-auth-prompt-signin"><a href="/sign-in"> Sign in</a> to save your score to the leaderboard!</div>
+              <div className="level-auth-prompt-text level-auth-prompt-signup"> Don't have an account yet?<a href="/register"> Sign up</a></div>
             </div>
           )}
+          <ScoreBreakdown
+            pairTierCounts={pairTierCounts}
+            timeBonus={timeBonus}
+            pm={Math.floor((rows * cols) / 2) / 8}
+            ldm={ldm}
+            totalScore={lastLevelScore}
+            totalPairs={Math.floor((rows * cols) / 2)}
+          />
           <LevelLeaderboard stage={stage} level={completions + 1} currentUserId={user?.userId} currentUsername={username} currentScore={lastLevelScore} />
-        </>
+        </div>
       ) : (
         <GameGrid
           board={board}
@@ -674,7 +805,10 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       )}
 
       {started && !timerExpired && (
-        <button className="btn-abandon" onClick={handleAbandon}>Abandon Game</button>
+        <button className="btn-abandon" onClick={() => setShowAbandonModal(true)}>Abandon Game</button>
+      )}
+      {showAbandonModal && (
+        <ConfirmAbandonModal onConfirm={() => { setShowAbandonModal(false); handleAbandon(); }} onCancel={() => setShowAbandonModal(false)} />
       )}
       {process.env.NODE_ENV === 'development' && started && !gameOver && !levelComplete && !timerExpired && !pendingStart && (
         <button className="btn-dev" onClick={devForceCompleteLevel}>⚡ Force Level</button>

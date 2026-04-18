@@ -433,28 +433,33 @@
   background: #dc2626;
 }
 
+/* Level complete panel — constrains all between-level components to a consistent width */
+.level-complete-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 400px;
+  padding: 0 0.75rem;
+  width: 100%;
+}
+
 /* Level auth prompt */
 .level-auth-prompt {
   background: #1f2937;
   border: 1px solid #374151;
   border-radius: 0.75rem;
-  max-width: 400px;
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 0.5rem;
   text-align: center;
   width: 100%;
 }
 
 .level-auth-prompt-text {
-  color: #9ca3af;
   font-size: 0.875rem;
-  margin-bottom: 1rem;
 }
 
-.level-auth-prompt-buttons {
-  align-items: center;
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
+.level-auth-prompt-signup {
+  color: #9ca3af;
+  font-size: 0.875rem;
 }
 
 .level-auth-btn {
@@ -471,11 +476,83 @@
   color: #fff;
 }
 
+/* Score breakdown */
+.score-breakdown {
+  background: #1f2937;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  padding: 1rem;
+  width: 100%;
+}
+
+.score-breakdown-title {
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+}
+
+.score-breakdown-table {
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  width: 100%;
+}
+
+.score-breakdown-table th {
+  color: #6b7280;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.score-breakdown-table th.sbt-label {
+  text-align: left;
+}
+
+.score-breakdown-table td {
+  color: #d1d5db;
+  padding: 0.3rem 0.5rem;
+  text-align: right;
+}
+
+.score-breakdown-table td.sbt-label {
+  color: #9ca3af;
+  text-align: left;
+}
+
+.score-breakdown-table td.sbt-mult {
+  font-weight: 600;
+}
+
+.score-breakdown-table tbody tr:nth-child(odd) {
+  background: #111827;
+}
+
+.sbt-subtotal-row td {
+  border-top: 1px solid #374151;
+  color: #9ca3af;
+  padding-top: 0.5rem;
+}
+
+.sbt-bonus-row td {
+  color: #4ade80;
+}
+
+.sbt-total-row td {
+  border-top: 1px solid #374151;
+  color: #00ff3c;
+  font-weight: 700;
+  padding-top: 0.4rem;
+}
+
 /* Level leaderboard */
 .level-leaderboard {
   background: #1f2937;
   border-radius: 0.75rem;
-  max-width: 400px;
   padding: 1.25rem 0;
   width: 100%;
 }
