@@ -4,6 +4,10 @@ import AmplifyProvider from "./components/AmplifyProvider";
 import { AuthProvider } from "./hooks/useAuth";
 import { GameSettingsProvider } from "./hooks/useGameSettings";
 import Header from "./components/Header";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "Pairanoia",
@@ -16,7 +20,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={cn("font-sans", geist.variable)}>
       <body>
         <AmplifyProvider>
           <AuthProvider>
