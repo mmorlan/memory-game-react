@@ -25,13 +25,12 @@ function LevelLeaderboard({ stage, level, currentUserId, currentUsername, curren
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!currentUserId) { setLoading(false); return; }
     const levelId = `STAGE#${stage}#LEVEL#${level}`;
     getSurvivalLevelLeaderboard(levelId, 10)
       .then(setEntries)
       .catch((e) => console.error("LevelLeaderboard fetch failed:", e))
       .finally(() => setLoading(false));
-  }, [stage, level, currentUserId]);
+  }, [stage, level]);
 
   // Merge current user's score optimistically so it shows immediately
   const merged: SurvivalLevelEntry[] = (() => {
