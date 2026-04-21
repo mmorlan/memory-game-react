@@ -27,6 +27,17 @@ export async function getUser(userId: string) {
   return result.Item;
 }
 
+export async function ensureUser(userId: string, username: string) {
+  const client = await getDocumentClient();
+  await client.send(new PutCommand({
+    TableName: "memory_users",
+    Item: { userID: userId, username },
+    ConditionExpression: "attribute_not_exists(userID)",
+  })).catch((e: unknown) => {
+    if ((e as { name?: string }).name !== "ConditionalCheckFailedException") throw e;
+  });
+}
+
 export async function updateUser(userId: string, fields: { username?: string; bio?: string }) {
   const client = await getDocumentClient();
   const parts: string[] = [];

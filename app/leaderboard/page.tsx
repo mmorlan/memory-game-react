@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { Trophy, Monitor, Smartphone } from "lucide-react";
 import { ChevronDown } from "../components/icons";
 import { LeaderboardEntry } from "../util/dynamodb";
@@ -206,10 +207,17 @@ export default function LeaderboardPage() {
                 <TableRow key={e.gameId} className="border-[#1f2937]">
                   <TableCell className={`text-center ${getRankClass(i)}`}>{i + 1}</TableCell>
                   <TableCell>
-                    <span className="flex items-center gap-1.5 font-semibold text-foreground">
-                      {e.device === "mobile" ? <Smartphone size={12} className="text-muted-foreground" /> : <Monitor size={12} className="text-muted-foreground" />}
-                      {e.username ?? "Anonymous"}
-                    </span>
+                    {e.username ? (
+                      <Link href={`/player/${encodeURIComponent(e.username)}`} className="flex items-center gap-1.5 font-semibold text-foreground hover:text-[#00ff3c] transition-colors no-underline">
+                        {e.device === "mobile" ? <Smartphone size={12} className="text-muted-foreground" /> : <Monitor size={12} className="text-muted-foreground" />}
+                        {e.username}
+                      </Link>
+                    ) : (
+                      <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                        {e.device === "mobile" ? <Smartphone size={12} className="text-muted-foreground" /> : <Monitor size={12} className="text-muted-foreground" />}
+                        Anonymous
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-[#00ff3c] font-bold">{e.score.toLocaleString()}</TableCell>
                   {mode === "freeplay"

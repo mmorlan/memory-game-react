@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getCurrentUser, fetchUserAttributes, signOut } from 'aws-amplify/auth';
-import { saveGame } from '../util/dynamodb';
+import { saveGame, ensureUser } from '../util/dynamodb';
 
 type AuthUser = Awaited<ReturnType<typeof getCurrentUser>>;
 
@@ -51,10 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const currentUser = await getCurrentUser();
       const attrs = await fetchUserAttributes();
-      const resolvedUsername = attrs.preferred_username ?? currentUser.signInDetails?.loginId ?? currentUser.username;
+      const resolvedUsername = currentUser.username ?? attrs.preferred_username ?? currentUser.signInDetails?.loginId ?? '';
       setUser(currentUser);
       setUsername(resolvedUsername);
       saveAuthCache(currentUser.userId, resolvedUsername);
+      ensureUser(currentUser.userId, resolvedUsername).catch(() => {});
 
       // Save any game completed while the user was unauthenticated
       const raw = typeof window !== 'undefined' ? localStorage.getItem('pendingGame') : null;
