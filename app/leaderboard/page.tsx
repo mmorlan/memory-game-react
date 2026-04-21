@@ -5,6 +5,14 @@ import { Trophy, Monitor, Smartphone } from "lucide-react";
 import { ChevronDown } from "../components/icons";
 import { LeaderboardEntry } from "../util/dynamodb";
 import { formatTime } from "../util/scoring";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
 import classes from "./page.module.css";
 
 type Mode = "freeplay" | "survival";
@@ -59,6 +67,13 @@ const DEVICE_OPTIONS: { value: DeviceFilter; label: string; icon: React.ReactNod
   { value: "desktop", label: "Desktop", icon: <Monitor size={14} /> },
   { value: "mobile",  label: "Mobile",  icon: <Smartphone size={14} /> },
 ];
+
+function getRankClass(index: number): string {
+  if (index === 0) return "text-yellow-400 font-bold";
+  if (index === 1) return "text-gray-400 font-bold";
+  if (index === 2) return "text-amber-600 font-bold";
+  return "text-muted-foreground font-semibold";
+}
 
 export default function LeaderboardPage() {
   const [mode, setMode] = useState<Mode>("freeplay");
@@ -162,41 +177,52 @@ export default function LeaderboardPage() {
         </div>
       )}
 
-      <div className={classes.card}>
-        <div className={classes["table-head"]}>
-          <span>#</span>
-          <span>Player</span>
-          <span>Score</span>
-          {mode === "freeplay" ? <span>Grid</span> : <span>Stage</span>}
-          {mode === "freeplay" ? <span>Time</span> : <span>Remaining Pairs</span>}
-        </div>
-
-        {loading ? (
-          <div className={classes.empty}>Loading...</div>
-        ) : error ? (
-          <div className={classes.empty}>{error}</div>
-        ) : filtered.length === 0 ? (
-          <div className={classes.empty}>No scores yet. Be the first!</div>
-        ) : (
-          <div className={classes.rows}>
-            {filtered.map((e, i) => (
-              <div key={e.gameId} className={`${classes.row}${i < 3 ? ` ${classes[`rank-${i + 1}`]}` : ""}`}>
-                <span className={classes.rank}>{i + 1}</span>
-                <span className={classes.player}>
-                  {e.device === "mobile" ? <Smartphone size={12} color="#6b7280" /> : <Monitor size={12} color="#6b7280" />}
-                  {e.username ?? "Anonymous"}
-                </span>
-                <span className={classes.score}>{e.score.toLocaleString()}</span>
-                {mode === "freeplay"
-                  ? <span>{e.rows}×{e.cols}</span>
-                  : <span>Stage {e.stage ?? 1}</span>}
-                {mode === "freeplay"
-                  ? <span>{formatTime(e.timeMs)}</span>
-                  : <span>{e.remainingPairs ?? "—"}</span>}
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="rounded-xl border border-[#374151] overflow-hidden w-fit mx-auto [&>div]:w-auto">
+        <Table className="w-auto">
+          <TableHeader>
+            <TableRow className="border-[#374151] hover:bg-transparent">
+              <TableHead className="text-center text-muted-foreground">#</TableHead>
+              <TableHead className="text-muted-foreground">Player</TableHead>
+              <TableHead className="text-muted-foreground">Score</TableHead>
+              <TableHead className="text-muted-foreground">{mode === "freeplay" ? "Grid" : "Stage"}</TableHead>
+              <TableHead className="text-muted-foreground">{mode === "freeplay" ? "Time" : "Remaining Pairs"}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-12">Loading...</TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-12">{error}</TableCell>
+              </TableRow>
+            ) : filtered.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={5} className="text-center text-muted-foreground py-12">No scores yet. Be the first!</TableCell>
+              </TableRow>
+            ) : (
+              filtered.map((e, i) => (
+                <TableRow key={e.gameId} className="border-[#1f2937]">
+                  <TableCell className={`text-center ${getRankClass(i)}`}>{i + 1}</TableCell>
+                  <TableCell>
+                    <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                      {e.device === "mobile" ? <Smartphone size={12} className="text-muted-foreground" /> : <Monitor size={12} className="text-muted-foreground" />}
+                      {e.username ?? "Anonymous"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-[#00ff3c] font-bold">{e.score.toLocaleString()}</TableCell>
+                  {mode === "freeplay"
+                    ? <TableCell>{e.rows}×{e.cols}</TableCell>
+                    : <TableCell>Stage {e.stage ?? 1}</TableCell>}
+                  {mode === "freeplay"
+                    ? <TableCell>{formatTime(e.timeMs)}</TableCell>
+                    : <TableCell>{e.remainingPairs ?? "—"}</TableCell>}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
     </main>
   );

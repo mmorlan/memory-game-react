@@ -4,7 +4,7 @@ import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { signIn } from 'aws-amplify/auth';
-import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { LogIn, User, Lock, Eye, EyeOff } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import classes from '../components/auth.module.css';
 
@@ -56,7 +56,7 @@ function SignInForm() {
   const params = useSearchParams();
   const confirmed = params.get('confirmed') === '1';
 
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,7 +67,7 @@ function SignInForm() {
     setIsSubmitting(true);
     try {
       await signIn({
-        username: email,
+        username: identifier,
         password,
         options: { authFlowType: 'USER_PASSWORD_AUTH' },
       });
@@ -95,16 +95,16 @@ function SignInForm() {
         <form onSubmit={handleSubmit}>
           <div className={classes['field-group']}>
             <div className={classes.field}>
-              <label htmlFor="email" className={classes['field-label']}>
-                <Mail size={12} /> Email
+              <label htmlFor="identifier" className={classes['field-label']}>
+                <User size={12} /> Username or Email
               </label>
               <input
-                id="email"
-                type="email"
-                name="email"
+                id="identifier"
+                type="text"
+                name="identifier"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
                 className={classes.input}
               />
             </div>

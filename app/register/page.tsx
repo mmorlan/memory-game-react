@@ -97,12 +97,11 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     try {
       await signUp({
-        username: email,
+        username,
         password,
         options: {
           userAttributes: {
             email,
-            preferred_username: username,
           },
         },
       });
@@ -119,7 +118,7 @@ export default function RegisterPage() {
     setError('');
     setIsConfirming(true);
     try {
-      await confirmSignUp({ username: email, confirmationCode: code });
+      await confirmSignUp({ username, confirmationCode: code });
       window.location.href = '/sign-in?confirmed=1';
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -132,7 +131,7 @@ export default function RegisterPage() {
     setResent(false);
     setError('');
     try {
-      await resendSignUpCode({ username: email });
+      await resendSignUpCode({ username });
       setResent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
