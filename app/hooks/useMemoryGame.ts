@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import useLocalStorage from "./useLocalStorage";
 import useStopwatch from "./useStopwatch";
 import { ICON_NAMES } from "../components/icons";
-import { calcPairScore } from "../util/scoring";
+import { calcPairScore, getTimeMultiplier } from "../util/scoring";
 
 export interface Card {
   id: number;
@@ -53,6 +53,8 @@ export default function useMemoryGame() {
   const [endTime, setEndTime] = useLocalStorage<number | null>("mg-end", null);
   const [started, setStarted] = useLocalStorage<boolean>("mg-started", false);
   const [score, setScore] = useLocalStorage<number>("mg-score", 0);
+  const [gameId, setGameId] = useLocalStorage<string>("mg-game-id", '');
+  const [pairTierCounts, setPairTierCounts] = useLocalStorage<Record<string, number>>("mg-tier-counts", {});
   const lastPairTimeRef = useRef<number>(Date.now());
   const totalPairTimeMsRef = useRef(0);
   const matchedPairCountRef = useRef(0);
@@ -96,6 +98,8 @@ export default function useMemoryGame() {
         totalPairTimeMsRef.current += timeToPair;
         matchedPairCountRef.current++;
         const totalPairs = Math.floor((rows * cols) / 2);
+        const tm = getTimeMultiplier(elapsed, totalPairs);
+        setPairTierCounts(prev => ({ ...prev, [String(tm)]: (prev[String(tm)] ?? 0) + 1 }));
         setScore(prev => prev + calcPairScore(totalPairs, elapsed));
       } else {
         setTimeout(() => {
@@ -117,6 +121,8 @@ export default function useMemoryGame() {
     setEndTime(null);
     setStarted(true);
     setScore(0);
+    setGameId(crypto.randomUUID());
+    setPairTierCounts({});
     lastPairTimeRef.current = Date.now();
     totalPairTimeMsRef.current = 0;
     matchedPairCountRef.current = 0;
@@ -128,6 +134,8 @@ export default function useMemoryGame() {
     setEndTime(null);
     setStarted(false);
     setScore(0);
+    setGameId('');
+    setPairTierCounts({});
     lastPairTimeRef.current = Date.now();
     totalPairTimeMsRef.current = 0;
     matchedPairCountRef.current = 0;
@@ -142,5 +150,5 @@ export default function useMemoryGame() {
     setBoard(prev => prev.map(c => ({ ...c, matched: true })));
   }
 
-  return { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs, devForceComplete };
+  return { board, rows, cols, started, allMatched, score, gameId, pairTierCounts, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs, devForceComplete };
 }

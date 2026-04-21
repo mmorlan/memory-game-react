@@ -72,12 +72,24 @@ export interface GameRecord {
   remainingPairs?: number;       // survival only
 }
 
-export async function saveGame(userId: string, game: Omit<GameRecord, "userId">): Promise<void> {
+export async function saveGame(
+  userId: string,
+  game: Omit<GameRecord, "userId">,
+  opts?: { allowOverwrite?: boolean },
+): Promise<void> {
   const client = await getDocumentClient();
-  await client.send(new PutCommand({
-    TableName: "memory_games",
-    Item: { userId, ...game },
-  }));
+  try {
+    await client.send(new PutCommand({
+      TableName: "memory_games",
+      Item: { userId, ...game },
+      // By default, reject duplicate gameIds so repeated saves (StrictMode, auth changes) are no-ops
+      ...(!opts?.allowOverwrite && {
+        ConditionExpression: "attribute_not_exists(gameId)",
+      }),
+    }));
+  } catch (e: unknown) {
+    if ((e as { name?: string }).name !== "ConditionalCheckFailedException") throw e;
+  }
 }
 
 export interface LeaderboardEntry extends GameRecord {

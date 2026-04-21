@@ -70,23 +70,26 @@ function LevelLeaderboard({ stage, level, currentUserId, currentUsername, curren
 
 function getTierLabels(totalPairs: number): { tm: number; label: string }[] {
   const t = 7.5 * totalPairs; // timer duration in seconds
-  const s = (n: number) => Math.round(t / n);
+  // Use floor for upper bounds so labels never over-promise a tier
+  const lo = (n: number) => Math.ceil(t / n);
+  const hi = (n: number) => Math.floor(t / n);
   return [
-    { tm: 5,   label: `< ${s(20)}s`            },
-    { tm: 3,   label: `${s(20)}–${s(6)}s`       },
-    { tm: 2,   label: `${s(6)}–${s(3)}s`        },
-    { tm: 1.5, label: `${s(3)}–${s(1.5)}s`      },
-    { tm: 1,   label: `> ${s(1.5)}s`            },
+    { tm: 5,   label: `< ${hi(20)}s`               },
+    { tm: 3,   label: `${lo(20)}–${hi(6)}s`         },
+    { tm: 2,   label: `${lo(6)}–${hi(3)}s`          },
+    { tm: 1.5, label: `${lo(3)}–${hi(1.5)}s`        },
+    { tm: 1,   label: `> ${lo(1.5)}s`               },
   ];
 }
 
-function ScoreBreakdown({ pairTierCounts, timeBonus, pm, ldm, totalScore, totalPairs }: {
+function ScoreBreakdown({ pairTierCounts, timeBonus, pm, ldm, totalScore, totalPairs, totalLabel = "Level Total" }: {
   pairTierCounts: Record<string, number>;
   timeBonus: number;
   pm: number;
   ldm: number;
   totalScore: number;
   totalPairs: number;
+  totalLabel?: string;
 }) {
   const rows = getTierLabels(totalPairs).flatMap(({ tm, label }) => {
     const pairs = pairTierCounts[String(tm)] ?? 0;
@@ -133,7 +136,7 @@ function ScoreBreakdown({ pairTierCounts, timeBonus, pm, ldm, totalScore, totalP
             </tr>
           )}
           <tr className="sbt-total-row">
-            <td colSpan={4}>Level Total</td>
+            <td colSpan={4}>{totalLabel}</td>
             <td>{totalScore.toLocaleString()}</td>
           </tr>
         </tfoot>
@@ -336,7 +339,7 @@ function Lives({ count, max = 3 }: { count: number; max?: number }) {
 function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) => void }) {
   const { user } = useAuth();
   const { cardsHidden } = useGameSettings();
-  const { board, rows, cols, started, allMatched, score, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs, devForceComplete } = useMemoryGame();
+  const { board, rows, cols, started, allMatched, score, gameId, pairTierCounts, handleCardClick, startGame, resetGame, elapsed, getAvgTimeToPairMs, devForceComplete } = useMemoryGame();
   const isMobile = getDevice() === "mobile";
   const rowOptions = isMobile ? MOBILE_ROW_OPTIONS : GRID_OPTIONS;
   const colOptions = isMobile ? MOBILE_COL_OPTIONS : GRID_OPTIONS;
@@ -355,9 +358,11 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
     onActiveChange(started && !allMatched);
   }, [started, allMatched, onActiveChange]);
 
-  // Reset save guard when a new game starts
+  // Generate a stable game ID when a new game starts
   useEffect(() => {
-    if (started) savedRef.current = false;
+    if (started) {
+      savedRef.current = false;
+    }
   }, [started]);
 
   // Save completed game to DynamoDB (authenticated)
@@ -367,7 +372,7 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
     const pairs = Math.floor((rows * cols) / 2);
     const now = new Date().toISOString();
     saveGame(user.userId, {
-      gameId: now,
+      gameId: gameId || now,
       mode: "freeplay",
       score,
       timeMs: elapsed,
@@ -419,7 +424,7 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       const pairs = Math.floor((rows * cols) / 2);
       const now = new Date().toISOString();
       saveGame(user.userId, {
-        gameId: now,
+        gameId: gameId || now,
         mode: "freeplay",
         score,
         timeMs: elapsed,
@@ -435,10 +440,22 @@ function FreeplayBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
   }
 
   if (allMatched && started) {
+    const totalPairs = Math.floor((rows * cols) / 2);
     return (
       <>
         <div className="win-message">You won in {formatTime(elapsed)}!</div>
         <div className="win-score">Score: {score.toLocaleString()}</div>
+        <div className="level-complete-panel">
+          <ScoreBreakdown
+            pairTierCounts={pairTierCounts}
+            timeBonus={0}
+            pm={totalPairs / 8}
+            ldm={1}
+            totalScore={score}
+            totalPairs={totalPairs}
+            totalLabel="Final Score"
+          />
+        </div>
         <button onClick={handleNewGame}>Play Again</button>
         {showSaveModal && <SaveScoreModal score={score} onSkip={() => setShowSaveModal(false)} />}
       </>
@@ -601,7 +618,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       clutchPairs,
       survived: false,
       remainingPairs: 0,
-    }).catch(console.error);
+    }, { allowOverwrite: true }).catch(console.error);
   }, [levelComplete, score, user, survivalGameId, stage, rows, cols, clutchPairs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Prompt unauthenticated user to save their score

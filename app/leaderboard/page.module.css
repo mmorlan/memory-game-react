@@ -1,7 +1,9 @@
 .page {
   margin: 0 auto;
   max-width: 1000px;
+  overflow-x: hidden;
   padding: 1rem;
+  width: 100%;
 }
 
 .header {
@@ -200,4 +202,13 @@
   color: #6b7280;
   padding: 3rem;
   text-align: center;
+}
+
+@media (width <= 640px) {
+  .table-head,
+  .row {
+    column-gap: 0.5rem;
+    grid-template-columns: 2rem 2fr 2fr 1fr 1fr;
+    padding: 0.75rem;
+  }
 }
