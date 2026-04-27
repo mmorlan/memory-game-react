@@ -595,7 +595,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
         clutchPairs,
         survived: false,
         remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
-      }).catch(console.error);
+      }, { allowOverwrite: true }).catch(console.error);
     }
     resetGame();
   }
@@ -665,7 +665,7 @@ function SurvivalBoard({ onActiveChange }: { onActiveChange: (active: boolean) =
       clutchPairs,
       survived,
       remainingPairs: Math.floor(board.filter(c => !c.matched && c.iconName !== "__blank__").length / 2),
-    }).catch(console.error);
+    }, { allowOverwrite: true }).catch(console.error);
   }, [gameOver, survived, user, rows, cols, score, stage, survivalGameId]);
 
   if (gameOver && survived) {
