@@ -27,8 +27,8 @@ async function scanAll(client: DynamoDBDocumentClient, tableName: string) {
 }
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get("x-dashboard-key");
-  if (authHeader !== process.env.DASHBOARD_SECRET) {
+  const userId = req.headers.get("x-user-id");
+  if (!userId || userId !== process.env.ADMIN_USER_ID) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

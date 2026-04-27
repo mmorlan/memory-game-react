@@ -5,6 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import useAuth from '../hooks/useAuth';
 import { GameRecord } from '../util/dynamodb';
 import { formatTime } from '../util/scoring';
 import classes from './page.module.css';
@@ -187,62 +188,25 @@ function computeMetrics(data: DashboardData) {
 }
 
 export default function DashboardPage() {
+  const { user, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [secret, setSecret] = useState('');
-  const [authenticated, setAuthenticated] = useState(false);
-
-  function handleAuth(e: React.FormEvent) {
-    e.preventDefault();
-    setAuthenticated(true);
-    localStorage.setItem('dashboard_key', secret);
-  }
 
   useEffect(() => {
-    const saved = localStorage.getItem('dashboard_key');
-    if (saved) {
-      setSecret(saved);
-      setAuthenticated(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!authenticated) return;
-    fetch('/api/dashboard', { headers: { 'x-dashboard-key': secret } })
+    if (authLoading || !user) return;
+    fetch('/api/dashboard', { headers: { 'x-user-id': user.userId } })
       .then(res => {
-        if (!res.ok) throw new Error(res.status === 401 ? 'Invalid key' : 'Failed to load');
+        if (!res.ok) throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to load');
         return res.json();
       })
       .then(setData)
-      .catch(e => {
-        setError(e.message);
-        if (e.message === 'Invalid key') {
-          localStorage.removeItem('dashboard_key');
-          setAuthenticated(false);
-        }
-      })
+      .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [authenticated, secret]);
+  }, [authLoading, user]);
 
-  if (!authenticated) {
-    return (
-      <main className={classes.page}>
-        <h1 className={classes.title}>Dashboard</h1>
-        <form onSubmit={handleAuth} className={classes['auth-form']}>
-          <input
-            type="password"
-            value={secret}
-            onChange={e => setSecret(e.target.value)}
-            placeholder="Dashboard key"
-            className={classes.input}
-          />
-          <button type="submit" className={classes['auth-btn']}>Access</button>
-        </form>
-      </main>
-    );
-  }
-
+  if (authLoading) return <main className={classes.page}><div className={classes.loading}>Loading...</div></main>;
+  if (!user) return <main className={classes.page}><div className={classes.error}>Sign in to access the dashboard.</div></main>;
   if (loading) return <main className={classes.page}><div className={classes.loading}>Loading dashboard data...</div></main>;
   if (error || !data) return <main className={classes.page}><div className={classes.error}>{error}</div></main>;
 
